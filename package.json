@@ -1,0 +1,48 @@
+{
+  "name": "sea-rematch-league",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview --port 5000",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p worker/tsconfig.json",
+    "emulators": "node -e \"require('fs').mkdirSync('.emulator-data',{recursive:true})\" && firebase emulators:start --import ./.emulator-data --export-on-exit",
+    "worker": "wrangler dev --config worker/wrangler.toml --port 8787",
+    "seed": "tsx scripts/seed.ts",
+    "test:rules": "firebase emulators:exec --only firestore \"node scripts/vitest.mjs run tests\"",
+    "deploy:worker": "wrangler deploy --config worker/wrangler.toml",
+    "deploy": "npm run build && firebase deploy --only hosting,firestore"
+  },
+  "dependencies": {
+    "firebase": "^13.2.0",
+    "html-to-image": "^1.11.11",
+    "marked": "^12.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261110.1",
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^6.3.0",
+    "firebase-admin": "^14.5.0",
+    "firebase-tools": "^15.35.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.6.3",
+    "vite": "^8.3.7",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.160.0"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.7",
+    "glob": "^14.0.4",
+    "uuid": "^11.1.1",
+    "@google-cloud/pubsub": {
+      "@opentelemetry/core": "^2.12.1"
+    }
+  }
+}

@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin()  { return signedIn() && request.auth.token.role in ['admin', 'owner']; }
+    function isOwner()  { return signedIn() && request.auth.token.role == 'owner'; }
+    function seasonLocked(s) { return get(/databases/$(db)/documents/seasons/$(s)).data.locked == true; }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function myPlayerId() { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data.playerId; }
+    function discordIdOf(uid) { return uid.split(':')[1]; }
+    function captains(t) { return get(/databases/$(db)/documents/teams/$(t)).data.captainIds; }
+    // Captains of either team set the match's single screenshot link (a new link replaces the old one).
+    function captainScreenshot() {
+      return signedIn() && changed().hasOnly(['screenshotUrls'])
+        && request.resource.data.screenshotUrls is list && request.resource.data.screenshotUrls.size() <= 1
+        && (myPlayerId() in captains(resource.data.homeTeamId) || myPlayerId() in captains(resource.data.awayTeamId));
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow update: if request.auth.uid == uid
+        && !changed().hasAny(['role', 'discordId', 'guildRoleIds', 'playerId']);
+      // Normally created by the Worker's discordAuth op. The app re-creates a missing record (e.g. after the
+      // emulator database was reset) with no privileges: role 'user', no roles, no player.
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.discordId == discordIdOf(uid)
+        && request.resource.data.role == 'user'
+        && request.resource.data.guildRoleIds.size() == 0
+        && request.resource.data.playerId == null;
+    }
+
+    match /players/{id} {
+      allow read: if true;
+      // Created by the Worker's setupPlayer op (or by admins).
+      allow create: if isAdmin();
+      // Owners edit their own profile fields.
+      allow update: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid
+        && changed().hasOnly(['name', 'nameLower', 'position', 'bio', 'country', 'updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+    match /teams/{id} { allow read: if true; allow write: if isAdmin(); }
+
+    match /seasons/{s} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      match /matches/{m} {
+        allow read: if true;
+        allow write: if isAdmin() && !seasonLocked(s);
+        allow update: if !seasonLocked(s) && captainScreenshot();
+      }
+      // Derived docs are recomputed in the admin's browser (no Cloud Functions on the free plan).
+      match /derived/{d}       { allow read: if true; allow write: if isAdmin(); }
+      match /predictions/{uid} { allow read: if true; allow write: if signedIn() && request.auth.uid == uid; }
+      match /powerRankings/{r} { allow read: if true; allow write: if isAdmin(); }
+      match /wrapped/{p} { allow read: if true; allow write: if isAdmin(); }
+      match /{sub}/{docId} {
+        allow read: if true;
+        allow write: if isAdmin() && sub in ['entries', 'rosters', 'matchweeks', 'transfers', 'playoffs', 'awards', 'ratings'];
+      }
+    }
+
+    match /requests/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.type in ['join_team', 'transfer', 'new_team', 'join_season', 'leave_season']
+        && request.resource.data.playerId == myPlayerId()
+        // Only a team's captain may ask for it to join or leave a season (admins decide).
+        && (!(request.resource.data.type in ['join_season', 'leave_season'])
+            || myPlayerId() in get(/databases/$(db)/documents/teams/$(request.resource.data.teamId)).data.captainIds);
+      allow update: if isAdmin(); // captains and requesters decide/cancel via the Worker's decideRequest op
+    }
+
+    match /cups/{c=**}         { allow read: if true; allow write: if isAdmin(); }
+    match /cups/{c}/matches/{m} { allow update: if captainScreenshot(); }
+    match /content/{d}         { allow read: if true; allow write: if isAdmin(); }
+    match /settings/{d} {
+      allow read: if d != 'admins';
+      allow write: if isAdmin() && d != 'admins';
+    }
+    match /settings/admins     { allow read: if isAdmin(); allow write: if isOwner(); }
+    match /private/{d}         { allow read: if isAdmin(); allow write: if false; } // Worker (service account) only
+    match /derived/{d}         { allow read: if true; allow write: if isAdmin(); }
+    match /analytics/{d=**}    { allow read: if isAdmin(); allow write: if false; }
+    match /clientErrors/{id}   {
+      allow create: if request.resource.data.keys().hasOnly(['message', 'stack', 'url', 'userAgent', 'uid', 'sessionId', 'count', 'firstAt', 'lastAt', 'hash'])
+        && request.resource.data.message is string && request.resource.data.message.size() < 2000;
+      allow read: if isAdmin();
+    }
+    // Append-only: each write's audit entry is committed by the writer's browser, stamped with their own uid.
+    match /auditLog/{id} {
+      allow read: if isAdmin();
+      allow create: if signedIn() && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.kind in ['client', 'note'];
+    }
+    match /restorePoints/{id=**} { allow read, write: if isAdmin(); }
+
+    // Records are recomputed with a collection-group query over every matches collection.
+    match /{path=**}/matches/{m} { allow read: if true; }
+
+    // Owners run merge-duplicates and restore in their browser, which touches any collection.
+    // The audit log stays append-only even for owners.
+    match /{col}/{rest=**} { allow read, write: if isOwner() && col != 'auditLog'; }
+  }
+}

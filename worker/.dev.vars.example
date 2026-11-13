@@ -1,0 +1,10 @@
+# Local Worker settings for `npm run worker` (copy to worker/.dev.vars; never commit the real file).
+# Talks to the Emulator Suite, so no service account is needed locally.
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
+ALLOWED_REDIRECTS=http://localhost:5000/auth/callback,http://localhost:5173/auth/callback
+
+# Only needed to test real Discord sign-in / bot calls locally:
+DISCORD_CLIENT_SECRET=
+DISCORD_BOT_TOKEN=
+DISCORD_PUBLIC_KEY=

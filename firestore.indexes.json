@@ -1,0 +1,30 @@
+{
+  "indexes": [
+    { "collectionGroup": "matches", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "round", "order": "ASCENDING" } ] },
+    { "collectionGroup": "matches", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "homeTeamId", "order": "ASCENDING" }, { "fieldPath": "round", "order": "ASCENDING" } ] },
+    { "collectionGroup": "matches", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "awayTeamId", "order": "ASCENDING" }, { "fieldPath": "round", "order": "ASCENDING" } ] },
+    { "collectionGroup": "matches", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "matchweek", "order": "ASCENDING" }, { "fieldPath": "kickoffAt", "order": "ASCENDING" } ] },
+    { "collectionGroup": "matches", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "verification", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "requests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "requests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "toTeamId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" } ] },
+    { "collectionGroup": "players", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "currentTeamId", "order": "ASCENDING" }, { "fieldPath": "nameLower", "order": "ASCENDING" } ] },
+    { "collectionGroup": "auditLog", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "actorUid", "order": "ASCENDING" }, { "fieldPath": "at", "order": "DESCENDING" } ] },
+    { "collectionGroup": "auditLog", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "at", "order": "DESCENDING" } ] }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "matches", "fieldPath": "games", "indexes": [] },
+    { "collectionGroup": "auditLog", "fieldPath": "before", "indexes": [] },
+    { "collectionGroup": "auditLog", "fieldPath": "after", "indexes": [] },
+    { "collectionGroup": "auditLog", "fieldPath": "diff", "indexes": [] }
+  ]
+}

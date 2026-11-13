@@ -1,0 +1,14 @@
+{
+  "name": "SEA Rematch League",
+  "short_name": "SRL",
+  "description": "Live standings, stats & fixtures",
+  "start_url": "/#home",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0c0c0c",
+  "theme_color": "#0c0c0c",
+  "icons": [
+    { "src": "/icons/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

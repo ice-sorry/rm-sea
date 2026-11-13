@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>SEA Rematch League</title>
+    <meta name="description" content="SEA Rematch League — live standings, stats & fixtures for Southeast Asia's REMATCH community." />
+    <meta name="theme-color" content="#0c0c0c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta property="og:title" content="SEA Rematch League" />
+    <meta property="og:description" content="Live standings, stats & fixtures" />
+    <meta property="og:image" content="/icons/og.jpg" />
+    <link rel="icon" type="image/png" href="/icons/logo.png" />
+    <link rel="apple-touch-icon" href="/icons/logo.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;1,700;1,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      /* Launch splash shown while the app boots */
+      #splash { position: fixed; inset: 0; display: grid; place-items: center; background: #0c0c0c; z-index: 9999; transition: opacity .3s ease-out; }
+      #splash img { width: 96px; height: 96px; border-radius: 22px; animation: pulse 1.2s ease-in-out infinite; }
+      @keyframes pulse { 50% { transform: scale(.94); opacity: .7; } }
+    </style>
+  </head>
+  <body>
+    <div id="splash"><img src="/icons/logo.png" alt="SRL" /></div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
