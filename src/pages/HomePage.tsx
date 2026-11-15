@@ -17,7 +17,7 @@ export default function HomePage() {
   return (
     <>
       <HomeHero />
-      <main className="page">
+      <main className="page home-page">
         {season && (
           <div className="season-heading">
             <h2 className="title">{season.name}</h2>
@@ -45,12 +45,15 @@ export default function HomePage() {
 
 const STATUS_LABEL: Record<string, string> = { draft: 'Coming soon', signups: 'Sign-ups open', live: 'In progress', finals: 'Finals', complete: 'Complete' };
 
+/** Home banner logo (public/home/logo.png). Falls back to the small app icon until that file exists. */
+const HOME_LOGO = '/home/logo.png';
+
 /** Centered home banner: logo, league name, a short intro and the Discord invite. */
 function HomeHero() {
   return (
     <header className="page-header home-hero">
       <div className="page-header-inner">
-        <img src={BRAND.logo} alt="" className="home-hero-logo" />
+        <img src={HOME_LOGO} alt="" className="home-hero-logo" onError={(e) => { if (!e.currentTarget.src.endsWith(BRAND.logo)) e.currentTarget.src = BRAND.logo; }} />
         <h1 className="title">{BRAND.appName.replace(/ League$/, '')} <em>League</em></h1>
         <p className="home-hero-desc">
           The competitive hub for {BRAND.region} {BRAND.game} and the top {BRAND.region} players.

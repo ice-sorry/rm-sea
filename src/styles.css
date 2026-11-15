@@ -69,6 +69,7 @@ img { max-width: 100%; }
 .page-header .view-all, .page-header a { color: #fff; }
 @media (min-width: 900px) { .page-header-inner { min-height: 220px; padding: 56px var(--s6); } }
 .page-header .title .flag { margin-left: 12px; vertical-align: middle; }
+.page.home-page { padding-bottom: 96px; }
 
 /* ---------- Home: main column + standings sidebar ---------- */
 .home-grid { display: grid; gap: var(--s8); grid-template-columns: minmax(0, 1fr); align-items: start; }
@@ -343,14 +344,21 @@ table.data thead tr.group-row th.group { color: var(--accent-2); box-shadow: ins
 .player-awards .badge { font-size: 11px; padding: 1px 6px; }
 
 /* ---------- Home hero ---------- */
-.home-hero { background: linear-gradient(110deg, var(--accent) 0%, #022559 100%); }
-.home-hero .page-header-inner { flex-direction: column; justify-content: center; text-align: center; gap: var(--s3); }
-.home-hero-logo { width: 72px; height: 72px; }
-.home-hero .title { margin-bottom: var(--s4); }
-.home-hero-desc { max-width: 640px; margin: 0; color: rgba(255,255,255,.85); font-size: 15px; line-height: 1.55; }
-.home-hero-invite { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s2); width: 100%; margin-top: var(--s2); font-size: 14px; color: rgba(255,255,255,.85); }
-.home-hero .btn.discord, .home-hero a.btn.discord { color: #fff; }
-.season-heading { display: flex; align-items: center; justify-content: center; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s6); text-align: center; }
+.home-hero { --hero-img: url('/home/hero-bg.jpg');
+  /* A dark wash keeps the text readable on the photo; the brand gradient shows if the image is missing. */
+  background: linear-gradient(rgba(5,10,25,.35), rgba(5,10,25,.6)), var(--hero-img) center / cover no-repeat, linear-gradient(
+          rgba(0, 0, 0, 0.4), 
+          rgba(0, 0, 0, 0.4)
+        ); background-blend-mode: darken; }
+.home-hero .page-header-inner { flex-direction: column; justify-content: center; text-align: center; gap: 0; min-height: 75vh; padding-top: var(--s8); padding-bottom: var(--s8); }
+.home-hero-logo { width: clamp(225px, 36vw, 420px); height: auto; margin-bottom: var(--s6); filter: drop-shadow(0 8px 24px rgba(0,0,0,.45)); }
+.home-hero .title { font-size: clamp(44px, 7vw, 88px); margin-bottom: 64px; text-shadow: 0 2px 16px rgba(0,0,0,.4); }
+.home-hero-desc { max-width: 960px; margin: 0; color: rgba(255,255,255,.9); font-size: clamp(16px, 1.6vw, 19px); line-height: 1.6; }
+.home-hero-invite { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s4); width: 100%; margin-top: var(--s8); font-size: 15px; color: rgba(255,255,255,.88); }
+.home-hero .btn.discord, .home-hero a.btn.discord { color: #fff; padding: 10px 22px; font-size: 16px; }
+.season-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3); margin-bottom: var(--s6); text-align: center; }
+.season-heading .title { font-size: clamp(44px, 6vw, 72px); }
+.season-heading .badge { font-size: 13px; padding: 4px 12px; }
 
 /* ---------- Buttons on the blue page header ---------- */
 /* The band is the brand blue, so primary buttons flip to white and the rest go glassy to stay distinct. */
