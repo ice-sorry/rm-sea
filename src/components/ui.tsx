@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { initials } from '../lib/format';
 import { copyPng, downloadPng } from '../lib/exportImage';
-import { BRAND } from '../lib/config';
+import { BRAND, FEATURES } from '../lib/config';
 import { errMsg } from '../lib/format';
 import type { Team } from '../lib/types';
 import { ASIA, OCEANIA, findCountry } from '../lib/countries';
@@ -160,10 +160,12 @@ export function ExportCard({ title, filename, children }: { title: string; filen
   const { run, busy } = useAction();
   return (
     <div>
-      <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
-        <button className="btn sm" disabled={busy} onClick={() => run(() => copyPng(ref.current!), 'Copied image to clipboard')}>📋 Copy as PNG</button>
-        <button className="btn sm" disabled={busy} onClick={() => run(() => downloadPng(ref.current!, filename))}>⬇️ Download PNG</button>
-      </div>
+      {FEATURES.imageExport && (
+        <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button className="btn sm" disabled={busy} onClick={() => run(() => copyPng(ref.current!), 'Copied image to clipboard')}>📋 Copy as PNG</button>
+          <button className="btn sm" disabled={busy} onClick={() => run(() => downloadPng(ref.current!, filename))}>⬇️ Download PNG</button>
+        </div>
+      )}
       <div ref={ref} className="export-card">
         <div className="export-head">
           <img src={BRAND.logo} alt="" />

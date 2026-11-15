@@ -33,4 +33,6 @@ export const FEATURES = {
   liveBadge: false,
   /** Predict tab on the league table (score picks + predicted table). */
   predictions: false,
+  /** Copy as PNG / Download PNG buttons on the standings and schedule cards. */
+  imageExport: false,
 };
