@@ -36,6 +36,8 @@ export interface Award {
 export interface GeneralSettings {
   currentSeasonId?: string; homeMode?: 'live' | 'pinned'; pinnedSeasonId?: string; leagueName?: string;
   socials?: Record<string, string>; siteUrl?: string;
+  /** Closed transfer window: players can't request to join, transfer or form a club. */
+  transfersBlocked?: boolean;
 }
 export type MatchDoc = Match & { verificationIssues?: string[]; verifiedOverride?: boolean };
 export interface StandingsDoc { rows: StandingRow[]; byRound: Record<string, string[]> }

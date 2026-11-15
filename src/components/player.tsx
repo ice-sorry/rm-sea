@@ -87,6 +87,7 @@ export function JoinTeamButton({ teamId }: { teamId: string }) {
   if (p.currentTeamId === teamId) return null;
   const pending = mine.find((r) => r.status === 'pending' && r.toTeamId === teamId);
   if (pending) return <span className="badge warn" style={{ fontSize: 13, padding: '6px 12px' }}>Request pending</span>;
+  if (L.general.transfersBlocked) return <span className="badge" style={{ fontSize: 13, padding: '6px 12px' }} title="An admin has closed the transfer window">🔒 Transfers closed</span>;
   const transfer = !!p.currentTeamId;
   if (!openForm) return <button className="btn primary" onClick={() => setOpen(true)}>{transfer ? '🔁 Request transfer' : '🙋 Request to join'}</button>;
   return (

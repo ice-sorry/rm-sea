@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { orderBy } from 'firebase/firestore';
-import { call } from '../lib/firebase';
+import { doc, orderBy } from 'firebase/firestore';
+import { setDoc } from '../lib/db';
+import { call, db } from '../lib/firebase';
 import { useLeague } from '../lib/league';
 import { useCol } from '../lib/hooks';
 import { SectionHeader, Empty, Field, useAction, TeamChip, Tabs } from '../components/ui';
@@ -18,6 +19,7 @@ export function AdminTransfers() {
   return (
     <>
       <SectionHeader eyebrow={`Moves · ${L.season?.name || ''}`} title="Mid-season" accent="transfers" />
+      <TransferWindow />
       <div className="card stack">
         <div className="form-grid">
           <Field label="Player"><select className="select" value={f.playerId} onChange={(e) => setF({ ...f, playerId: e.target.value })}><option value="">—</option>{L.playerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
@@ -38,6 +40,26 @@ export function AdminTransfers() {
         {!transfers.length && <Empty>No transfers this season.</Empty>}
       </div>
     </>
+  );
+}
+
+/** Admin switch for the transfer window. Closed: players can't ask to join, transfer or form a club, and captains
+ *  can't accept pending moves. Admins can still move players and accept requests. */
+function TransferWindow() {
+  const L = useLeague();
+  const { run, busy } = useAction();
+  const blocked = !!L.general.transfersBlocked;
+  return (
+    <div className="card row wrap">
+      <span className={`badge ${blocked ? 'warn' : 'ok'}`} style={{ fontSize: 13, padding: '4px 10px' }}>{blocked ? '🔒 Transfers closed' : '🔓 Transfers open'}</span>
+      <span className="grow small muted">{blocked
+        ? "Players can't request to join, transfer or create a club, and captains can't accept pending moves. Admins can still move players."
+        : 'Players can request to join or transfer, and captains can accept.'}</span>
+      <button className={`btn ${blocked ? 'primary' : 'danger'}`} disabled={busy}
+        onClick={() => run(() => setDoc(doc(db, 'settings/general'), { transfersBlocked: !blocked }, { merge: true }), blocked ? 'Transfers reopened' : 'Transfers closed')}>
+        {blocked ? 'Open transfers' : 'Block transfers'}
+      </button>
+    </div>
   );
 }
 

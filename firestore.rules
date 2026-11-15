@@ -9,6 +9,11 @@ service cloud.firestore {
     function myPlayerId() { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data.playerId; }
     function discordIdOf(uid) { return uid.split(':')[1]; }
     function captains(t) { return get(/databases/$(db)/documents/teams/$(t)).data.captainIds; }
+    // Admins close the transfer window in settings/general (Admin → Moves → Transfers).
+    function transfersOpen() {
+      let g = /databases/$(db)/documents/settings/general;
+      return !exists(g) || get(g).data.get('transfersBlocked', false) != true;
+    }
     // Captains of either team set the match's single screenshot link (a new link replaces the old one).
     function captainScreenshot() {
       return signedIn() && changed().hasOnly(['screenshotUrls'])
@@ -68,6 +73,8 @@ service cloud.firestore {
         && request.resource.data.status == 'pending'
         && request.resource.data.type in ['join_team', 'transfer', 'new_team', 'join_season', 'leave_season']
         && request.resource.data.playerId == myPlayerId()
+        // Player moves (join, transfer, new club) wait while the transfer window is closed.
+        && (request.resource.data.type in ['join_season', 'leave_season'] || transfersOpen())
         // Only a team's captain may ask for it to join or leave a season (admins decide).
         && (!(request.resource.data.type in ['join_season', 'leave_season'])
             || myPlayerId() in get(/databases/$(db)/documents/teams/$(request.resource.data.teamId)).data.captainIds);

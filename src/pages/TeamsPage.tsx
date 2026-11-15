@@ -67,6 +67,8 @@ function CreateTeam({ onDone }: { onDone: () => void }) {
         <><p className="muted" style={{ margin: 0 }}>Sign in with Discord to request a new club.</p><SignInButton big /></>
       ) : !p ? (
         <p className="muted" style={{ margin: 0 }}>Set up your player first. <a href="#me">Set up my player →</a></p>
+      ) : L.general.transfersBlocked ? (
+        <p className="muted" style={{ margin: 0 }}>🔒 Transfers are closed right now, so new clubs can't be requested. Check back when an admin reopens the window.</p>
       ) : (
         <>
           <Field label="Club name"><input className="input" value={f.name} maxLength={40} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>

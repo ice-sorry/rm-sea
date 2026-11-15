@@ -126,6 +126,11 @@ export async function announceMoves(moves: RosterMove[]) {
   if (real.length) await invoke('notifyRosterMove', { moves: real }).catch(() => undefined);
 }
 
+/** True while an admin has closed the transfer window (Admin → Moves → Transfers). */
+export async function transfersBlocked() {
+  return !!(await getSettings<{ transfersBlocked?: boolean }>('general')).transfersBlocked;
+}
+
 const embedColor = (hex: unknown) => (typeof hex === 'string' && /^#[0-9a-f]{6}$/i.test(hex) ? parseInt(hex.slice(1), 16) : 0x1d8ade);
 
 /** Posts roster moves to the roster channel set in Admin → Settings → Discord & roles. Silently skips when unset. */
@@ -207,6 +212,9 @@ export const decideRequest = onCall(async (req) => {
     await ref.update({ status: 'declined', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
     return { status: 'declined' };
   }
+
+  // A closed transfer window stops captains approving moves that were requested before it closed. Admins can override.
+  if (!seasonRequest && !isAdminReq(req) && (await transfersBlocked())) throw new HttpsError('failed-precondition', 'Transfers are closed right now.');
 
   // Team requests work between seasons too: with no season the player's team is set directly (no season roster).
   const seasonId: string | null = r.seasonId || (await currentSeasonId()) || null;

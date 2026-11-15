@@ -130,6 +130,12 @@ describe('self-service', () => {
     await assertFails(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'transfer', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'accepted', toTeamId: 't2' }));
     await assertFails(addDoc(collection(as(USER), 'requests'), { type: 'join_team', playerId: 'p-cap', requestedBy: USER, status: 'pending', toTeamId: 't2' }));
   });
+  it('a closed transfer window blocks player-move requests but not season requests', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'settings/general'), { currentSeasonId: 's1', transfersBlocked: true }));
+    await assertFails(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'transfer', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'pending', toTeamId: 't2' }));
+    await assertFails(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'new_team', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'pending', toTeamId: null, teamName: 'X' }));
+    await assertSucceeds(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'join_season', teamId: 't1', seasonId: 's1', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'pending', toTeamId: null }));
+  });
   it('only a team captain can ask for the team to join or leave a season', async () => {
     const req = (type: string, teamId: string, by = CAPTAIN, playerId = 'p-cap') =>
       addDoc(collection(as(by), 'requests'), { type, teamId, seasonId: 's1', playerId, requestedBy: by, status: 'pending', toTeamId: null });
