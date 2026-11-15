@@ -53,13 +53,11 @@ function HomeHero() {
         <img src={BRAND.logo} alt="" className="home-hero-logo" />
         <h1 className="title">{BRAND.appName.replace(/ League$/, '')} <em>League</em></h1>
         <p className="home-hero-desc">
-          The community league for {BRAND.game} players in {BRAND.region}. Clubs from across the region compete in a
-          seasonal league, then battle it out in the playoffs and cups for silverware and end-of-season awards. Every
-          result, stat and transfer is tracked here.
+          The competitive hub for {BRAND.region} {BRAND.game} and the top {BRAND.region} players.
         </p>
         <div className="home-hero-invite">
-          <span>New here? Join the community to find a team, get match news and meet other players.</span>
-          <a className="btn discord" href={SOCIALS.discord} target="_blank" rel="noreferrer"><DiscordIcon />Join our Discord</a>
+          <span>Join the community to find a team, meet other players and improve your skills!</span>
+          <a className="btn discord" href={SOCIALS.discord} target="_blank" rel="noreferrer"><DiscordIcon />Discord</a>
         </div>
       </div>
     </header>
