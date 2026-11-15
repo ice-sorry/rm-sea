@@ -62,7 +62,7 @@ export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { key
 export function Crest({ team, size = '' }: { team?: Team | null; size?: '' | 'sm' | 'lg' }) {
   if (!team) return <span className={`crest ${size}`} style={{ background: 'var(--surface-2)' }}>?</span>;
   // Discord attachment links expire after ~24 h; imageSrc() routes them through the Worker, which re-signs them.
-  if (team.crestUrl) return <img className={`crest ${size}`} src={imageSrc(team.crestUrl)} alt="" style={{ background: team.color }} loading="lazy" />;
+  if (team.crestUrl) return <img className={`crest logo ${size}`} src={imageSrc(team.crestUrl)} alt="" loading="lazy" />;
   return <span className={`crest ${size}`} style={{ background: team.color || 'var(--accent)' }}>{(team.shortName || initials(team.name)).slice(0, 3)}</span>;
 }
 
