@@ -38,7 +38,6 @@ export function TopBar({ route }: { route: string }) {
             {L.seasons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         )}
-        <a className="icon-btn hide-sm" href={SOCIALS.discord} target="_blank" rel="noreferrer" aria-label="Discord"><DiscordIcon /></a>
         {SOCIALS.youtube && <a className="icon-btn" href={SOCIALS.youtube} target="_blank" rel="noreferrer" aria-label="YouTube"><YouTubeIcon /></a>}
         {L.authUser ? (
           <div style={{ position: 'relative' }}>
