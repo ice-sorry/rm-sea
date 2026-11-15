@@ -1,5 +1,5 @@
 import { onCall, HttpsError, invoke, CallableRequest } from './runtime';
-import { db, FieldValue, requireAuth, requireAdmin, roleOf, currentSeasonId, DISCORD_BOT_TOKEN, auditNote } from './admin';
+import { db, FieldValue, requireAuth, requireAdmin, roleOf, currentSeasonId, getSettings, DISCORD_BOT_TOKEN, auditNote } from './admin';
 import { avatarUrl, discordApi } from './discord';
 import { POSITIONS, Position } from './shared/league';
 
@@ -118,6 +118,53 @@ export async function syncRolesFor(teamIds: (string | null)[]) {
   if (ids.length) await invoke('syncTeamRoles', { teamIds: ids }).catch(() => undefined);
 }
 
+export interface RosterMove { playerId: string; fromTeamId: string | null; toTeamId: string | null }
+
+/** Best-effort Discord post for players who signed for or left a team (needs the bot token, so it runs in the Worker). */
+export async function announceMoves(moves: RosterMove[]) {
+  const real = moves.filter((m) => m.playerId && (m.fromTeamId || null) !== (m.toTeamId || null));
+  if (real.length) await invoke('notifyRosterMove', { moves: real }).catch(() => undefined);
+}
+
+const embedColor = (hex: unknown) => (typeof hex === 'string' && /^#[0-9a-f]{6}$/i.test(hex) ? parseInt(hex.slice(1), 16) : 0x1d8ade);
+
+/** Posts roster moves to the roster channel set in Admin → Settings → Discord & roles. Silently skips when unset. */
+export const notifyRosterMove = onCall(async (req) => {
+  requireAdmin(req);
+  const moves = (((req.data?.moves as RosterMove[]) || []).filter((m) => m?.playerId && (m.fromTeamId || null) !== (m.toTeamId || null))).slice(0, 10);
+  const token = DISCORD_BOT_TOKEN.value();
+  if (!moves.length || !token) return { posted: 0 };
+  const [integ, general] = await Promise.all([
+    getSettings<{ rosterChannelId?: string }>('integrations'),
+    getSettings<{ siteUrl?: string }>('general'),
+  ]);
+  const channelId = String(integ.rosterChannelId || '').trim();
+  if (!channelId) return { posted: 0 };
+  const paths = [...new Set(moves.flatMap((m) => [`players/${m.playerId}`, m.fromTeamId ? `teams/${m.fromTeamId}` : '', m.toTeamId ? `teams/${m.toTeamId}` : '']).filter(Boolean))];
+  const snaps = await db.getAll(...paths.map((x) => db.doc(x)));
+  const data = new Map(paths.map((x, i) => [x, snaps[i].data() || {}]));
+  const site = String(general.siteUrl || '').replace(/\/+$/, '');
+  const embeds = moves.map((m) => {
+    const p = data.get(`players/${m.playerId}`) || {};
+    const from = m.fromTeamId ? data.get(`teams/${m.fromTeamId}`) : null;
+    const to = m.toTeamId ? data.get(`teams/${m.toTeamId}`) : null;
+    const who = `**${p.name || 'A player'}**${p.discordId ? ` (<@${p.discordId}>)` : ''}`;
+    const fromName = from?.name || 'their team', toName = to?.name || 'a new team';
+    const [title, description] = !m.fromTeamId ? ['✍️ Signed', `${who} has signed for **${toName}**.`]
+      : !m.toTeamId ? ['👋 Left team', `${who} has left **${fromName}** and is now a free agent.`]
+      : ['🔁 Transfer', `${who} has left **${fromName}** and signed for **${toName}**.`];
+    return {
+      title, description, color: embedColor((to || from)?.color),
+      ...(site ? { url: `${site}/#player/${encodeURIComponent(m.playerId)}` } : {}),
+      ...(p.avatarUrl ? { thumbnail: { url: p.avatarUrl } } : {}),
+      timestamp: new Date().toISOString(),
+    };
+  });
+  // allowed_mentions: show the player's handle without pinging them.
+  await discordApi(token, 'POST', `/channels/${channelId}/messages`, { embeds, allowed_mentions: { parse: [] } });
+  return { posted: moves.length };
+});
+
 /** Admin mid-season transfer. Runs in the admin's browser. */
 export const transferPlayer = onCall(async (req) => {
   const uid = requireAdmin(req);
@@ -127,6 +174,7 @@ export const transferPlayer = onCall(async (req) => {
   const r = await movePlayer(sid, playerId, toTeamId || null, uid, 'admin', startingRound);
   await auditNote(uid, `Transfer ${playerId}: ${r.fromTeamId ?? 'free agent'} → ${toTeamId ?? 'free agent'}`, `players/${playerId}`);
   await syncRolesFor([r.fromTeamId, r.toTeamId]);
+  await announceMoves([{ playerId, ...r }]);
   return r;
 });
 
@@ -177,9 +225,16 @@ export const decideRequest = onCall(async (req) => {
       name, shortName: name.slice(0, 4).toUpperCase(), nameNormalized: normalizeTeamName(name), color: r.color || '#1D8ADE',
       crestUrl: '', discordRoleId: null, captainIds: [r.playerId], active: true, mergedInto: null,
     });
-    if (seasonId) await movePlayer(seasonId, r.playerId, teamRef.id, uid, 'request');
-    else await db.doc(`players/${r.playerId}`).update({ currentTeamId: teamRef.id, updatedAt: FieldValue.serverTimestamp() });
+    let fromTeamId: string | null;
+    if (seasonId) fromTeamId = (await movePlayer(seasonId, r.playerId, teamRef.id, uid, 'request')).fromTeamId;
+    else {
+      const p = await db.doc(`players/${r.playerId}`).get();
+      fromTeamId = (p.data()?.currentTeamId as string) || null;
+      await p.ref.update({ currentTeamId: teamRef.id, updatedAt: FieldValue.serverTimestamp() });
+    }
     await ref.update({ status: 'accepted', toTeamId: teamRef.id, decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
+    await syncRolesFor([fromTeamId]);
+    await announceMoves([{ playerId: r.playerId, fromTeamId, toTeamId: teamRef.id }]);
     return { status: 'accepted', teamId: teamRef.id };
   }
   let moved: { fromTeamId: string | null; toTeamId: string | null };
@@ -191,6 +246,7 @@ export const decideRequest = onCall(async (req) => {
   }
   await ref.update({ status: 'accepted', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
   await syncRolesFor([moved.fromTeamId, moved.toTeamId]);
+  await announceMoves([{ playerId: r.playerId, ...moved }]);
   return { status: 'accepted' };
 });
 

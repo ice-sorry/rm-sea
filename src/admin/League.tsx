@@ -6,7 +6,7 @@ import { useLeague } from '../lib/league';
 import { SectionHeader, Empty, Crest, Field, useAction, Confirm, Avatar, TeamChip, Flag, CountrySelect } from '../components/ui';
 import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Position, Team, Player } from '../lib/types';
-import { actor, normalizeTeamName, syncTeamRoles } from './util';
+import { actor, normalizeTeamName, notifyRosterMove, syncTeamRoles } from './util';
 
 // ======================= Teams =======================
 const blankTeam = { name: '', shortName: '', color: '#1D8ADE', crestUrl: '', discordRoleId: '', captainIds: [] as string[], active: true };
@@ -175,6 +175,7 @@ export function AdminRosters() {
     if (isCurrent) b.update(doc(db, 'players', pid), { currentTeamId: teamId, updatedAt: serverTimestamp() });
     await b.commit();
     await syncTeamRoles(other, teamId);
+    if (isCurrent) await notifyRosterMove({ playerId: pid, fromTeamId: other || null, toTeamId: teamId });
     setAdd('');
   }, 'Added to roster');
   const remove = (pid: string) => run(async () => {
@@ -183,6 +184,7 @@ export function AdminRosters() {
     if (isCurrent) b.update(doc(db, 'players', pid), { currentTeamId: null, updatedAt: serverTimestamp() });
     await b.commit();
     await syncTeamRoles(teamId);
+    if (isCurrent) await notifyRosterMove({ playerId: pid, fromTeamId: teamId, toTeamId: null });
   }, 'Removed');
   const copy = () => run(async () => {
     const src = await getDocs(collection(db, `seasons/${copyFrom}/rosters`));

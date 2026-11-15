@@ -66,15 +66,16 @@ function General() {
 function Discord() {
   const { run, busy } = useAction();
   const [f, setF] = useSettingsForm('settings/integrations', {
-    guildId: '1562776724431831050', matchReportChannelId: '', alertsChannelId: '', autoPost: true, autoPostOnEdit: false,
+    guildId: '1562776724431831050', matchReportChannelId: '', alertsChannelId: '', rosterChannelId: '', autoPost: true, autoPostOnEdit: false,
   });
   const text = (k: keyof typeof f, label: string) => <Field label={label}><input className="input" value={String(f[k] ?? '')} onChange={(e) => setF({ ...f, [k]: e.target.value.trim() })} /></Field>;
   return (
     <div className="stack">
       <div className="card stack">
         <div className="form-grid">
-          {text('guildId', 'Guild (server) ID')}{text('matchReportChannelId', 'Match report channel ID')}{text('alertsChannelId', 'Alerts channel ID')}
+          {text('guildId', 'Guild (server) ID')}{text('matchReportChannelId', 'Match report channel ID')}{text('alertsChannelId', 'Alerts channel ID')}{text('rosterChannelId', 'Roster moves channel ID')}
         </div>
+        <p className="small muted" style={{ margin: 0 }}>Roster moves: the bot posts there when a player signs for or leaves a team. Leave it blank to turn the posts off. The bot needs Send Messages and Embed Links in that channel.</p>
         <div className="row wrap">
           <label className="check"><input type="checkbox" checked={!!f.autoPost} onChange={(e) => setF({ ...f, autoPost: e.target.checked })} />Auto-post results to Discord</label>
           <label className="check"><input type="checkbox" checked={!!f.autoPostOnEdit} onChange={(e) => setF({ ...f, autoPostOnEdit: e.target.checked })} />…and when a result is edited</label>
