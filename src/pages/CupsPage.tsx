@@ -4,6 +4,7 @@ import { PageHeader, SectionHeader, Empty, Crest, TeamChip, Skeleton } from '../
 import { BracketView, FixtureCard, ResultCard } from '../components/league';
 import { cupTeamIds } from '../lib/types';
 import type { Cup, MatchDoc } from '../lib/types';
+import { Trophy } from 'lucide-react';
 
 /** #cups (and the old #cup link): every running cup — its name, the teams in it and the bracket — plus the archive. */
 export default function CupsPage(_: { mode: 'cups' | 'cup'; sub: string }) {
@@ -35,9 +36,9 @@ export function CupView({ cup }: { cup: Cup }) {
   const champ = cup.championTeamId ? L.teams[cup.championTeamId] : null;
   return (
     <div className="card stack">
-      <h3 style={{ margin: 0 }}>🏆 {cup.name}</h3>
+      <h3 style={{ margin: 0 }}><Trophy size={18} aria-hidden />{cup.name}</h3>
       <CupTeams cup={cup} />
-      {champ && <div className="row"><span style={{ fontSize: 28 }}>🏆</span><Crest team={champ} /><b>{champ.name}</b><span className="muted">champions</span></div>}
+      {champ && <div className="row"><Trophy size={28} color="var(--zone-champion)" aria-hidden /><Crest team={champ} /><b>{champ.name}</b><span className="muted">champions</span></div>}
       <BracketView bracket={cup.bracket} />
       {matches.length > 0 && <div className="card-list two">{[...matches].sort((a, b) => a.round - b.round).map((m) => (m.status === 'played' ? <ResultCard key={m.id} m={m} cupId={cup.id} /> : <FixtureCard key={m.id} m={m} cupId={cup.id} />))}</div>}
     </div>
@@ -56,7 +57,7 @@ function Archive({ cups }: { cups: Cup[] }) {
             <details key={c.id} className="card">
               <summary style={{ cursor: 'pointer' }} className="row">
                 <b className="grow">{c.name}</b>{c.seasonId && <span className="muted small">{L.seasons.find((s) => s.id === c.seasonId)?.name || c.seasonId}</span>}
-                {c.championTeamId && <span className="row small">🏆 <Crest team={L.teams[c.championTeamId]} size="sm" />{L.teams[c.championTeamId]?.name}</span>}
+                {c.championTeamId && <span className="row small"><Trophy size={14} aria-hidden /><Crest team={L.teams[c.championTeamId]} size="sm" />{L.teams[c.championTeamId]?.name}</span>}
               </summary>
               <div className="stack" style={{ marginTop: 12 }}><CupTeams cup={c} /><BracketView bracket={c.bracket} /></div>
             </details>

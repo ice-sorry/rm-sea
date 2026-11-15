@@ -6,6 +6,7 @@ import { BracketView, FixtureCard, ResultCard } from '../components/league';
 import { fmtDateTime } from '../lib/format';
 import type { Bracket, MatchDoc } from '../lib/types';
 import { groupBy } from '../lib/types';
+import { CalendarDays, Camera, Shield, Trophy } from 'lucide-react';
 
 type Tab = 'fixtures' | 'playoffs';
 
@@ -17,7 +18,7 @@ export default function FixturesPage({ sub }: { sub: string }) {
     <PageHeader eyebrow={season?.name || 'League'} title="Fixtures &" accent="results" />
     <main className="page">
       <section>
-        <Tabs tabs={[{ key: 'fixtures', label: 'Fixtures', emoji: '🗓️' }, { key: 'playoffs', label: 'Playoffs', emoji: '🏆' }]} active={tab} onChange={(k) => go(`fixtures/${k}`)} />
+        <Tabs tabs={[{ key: 'fixtures', label: 'Fixtures', icon: CalendarDays }, { key: 'playoffs', label: 'Playoffs', icon: Trophy }]} active={tab} onChange={(k) => go(`fixtures/${k}`)} />
         {tab === 'fixtures' ? <FixturesTab /> : <PlayoffsTab />}
       </section>
     </main>
@@ -55,7 +56,7 @@ function FixturesTab() {
           <option value="">All teams</option>{L.teamList.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         <span className="grow" />
-        <button className="btn sm" onClick={() => setExporting(!exporting)}>📸 Full schedule</button>
+        <button className="btn sm" onClick={() => setExporting(!exporting)}><Camera size={14} aria-hidden />Full schedule</button>
       </div>
       {exporting && <ScheduleExport ms={league} />}
       {!league.length && <Empty>No fixtures yet — the schedule is published once the season launches.</Empty>}
@@ -97,8 +98,8 @@ function PlayoffsTab() {
   return (
     <div className="stack" style={{ gap: 24 }}>
       {!brackets.length && <Empty>The playoff bracket is drawn when the regular season ends.</Empty>}
-      {finals && <div className="card"><h3>🏆 {finals.name}</h3><BracketView bracket={finals} /></div>}
-      {others.map((b) => <div key={b.id} className="card"><h3>🛡️ {b.name}</h3><BracketView bracket={b} /></div>)}
+      {finals && <div className="card"><h3><Trophy size={18} aria-hidden />{finals.name}</h3><BracketView bracket={finals} /></div>}
+      {others.map((b) => <div key={b.id} className="card"><h3><Shield size={18} aria-hidden />{b.name}</h3><BracketView bracket={b} /></div>)}
       {playoffMatches.length > 0 && (
         <div>
           <div className="eyebrow">Playoff games</div>

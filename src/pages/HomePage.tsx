@@ -9,6 +9,7 @@ import { BracketView, FixtureCard, LeagueTable, ResultCard, useMatchLists } from
 import { useModal } from '../modals/ModalContext';
 import { fmtAgo, fmtDateTime } from '../lib/format';
 import type { Award, Bracket, Season, StandingsDoc } from '../lib/types';
+import { Trophy } from 'lucide-react';
 
 export default function HomePage() {
   const L = useLeague();
@@ -226,7 +227,7 @@ function PinnedCelebration({ seasonId }: { seasonId: string }) {
     <PageHeader eyebrow={BRAND.appName} title={season?.name || seasonId} accent="champions" />
     <main className="page">
       <div className="hero-pin">
-        <div className="trophy">🏆</div>
+        <div className="trophy"><Trophy size={64} aria-hidden /></div>
         <div className="eyebrow">{season?.name || seasonId} champions</div>
         <h1 className="title" style={{ fontSize: 56 }}>{champ?.name || 'TBC'}</h1>
         {champ && <div style={{ marginTop: 16 }}><Crest team={champ} size="lg" /></div>}

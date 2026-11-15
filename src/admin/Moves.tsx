@@ -7,6 +7,7 @@ import { useCol } from '../lib/hooks';
 import { SectionHeader, Empty, Field, useAction, TeamChip, Tabs } from '../components/ui';
 import { fmtAgo, ms } from '../lib/format';
 import type { RequestDoc } from '../lib/types';
+import { Lock, LockOpen } from 'lucide-react';
 
 export function AdminTransfers() {
   const L = useLeague();
@@ -51,7 +52,7 @@ function TransferWindow() {
   const blocked = !!L.general.transfersBlocked;
   return (
     <div className="card row wrap">
-      <span className={`badge ${blocked ? 'warn' : 'ok'}`} style={{ fontSize: 13, padding: '4px 10px' }}>{blocked ? '🔒 Transfers closed' : '🔓 Transfers open'}</span>
+      <span className={`badge ${blocked ? 'warn' : 'ok'}`} style={{ fontSize: 13, padding: '4px 10px' }}>{blocked ? <><Lock size={13} aria-hidden />Transfers closed</> : <><LockOpen size={13} aria-hidden />Transfers open</>}</span>
       <span className="grow small muted">{blocked
         ? "Players can't request to join, transfer or create a club, and captains can't accept pending moves. Admins can still move players."
         : 'Players can request to join or transfer, and captains can accept.'}</span>

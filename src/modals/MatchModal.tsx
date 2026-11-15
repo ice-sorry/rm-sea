@@ -9,6 +9,7 @@ import { useModal } from './ModalContext';
 import { fmtDateTime } from '../lib/format';
 import { imageSrc, normalizeImageLink } from '../lib/images';
 import type { MatchDoc } from '../lib/types';
+import { Camera, Clock, Goal, Star, Wrench } from 'lucide-react';
 
 export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?: string; seasonId?: string }) {
   const L = useLeague();
@@ -41,15 +42,15 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
         </div>
         {m.status === 'played' && <div className="center small muted">Goals {m.goalsHome}–{m.goalsAway}{m.verification === 'check' && <span className="badge warn" style={{ marginLeft: 8 }}>Under review</span>}</div>}
       </div>
-      {m.mvpPlayerId && <div className="row" style={{ justifyContent: 'center', cursor: 'pointer' }} onClick={() => open({ kind: 'player', id: m.mvpPlayerId! })}>⭐ MVP <Avatar src={L.players[m.mvpPlayerId]?.avatarUrl} name={name(m.mvpPlayerId)} size="sm" /><b>{name(m.mvpPlayerId)}</b><Flag country={L.players[m.mvpPlayerId]?.country} /></div>}
+      {m.mvpPlayerId && <div className="row" style={{ justifyContent: 'center', cursor: 'pointer' }} onClick={() => open({ kind: 'player', id: m.mvpPlayerId! })}><Star size={14} aria-hidden /> MVP <Avatar src={L.players[m.mvpPlayerId]?.avatarUrl} name={name(m.mvpPlayerId)} size="sm" /><b>{name(m.mvpPlayerId)}</b><Flag country={L.players[m.mvpPlayerId]?.country} /></div>}
       {(m.games || []).map((g) => {
         const scorers = Object.entries(g.playerStats || {}).filter(([, s]) => (s.goals || 0) > 0);
         return (
           <div key={g.n} className="card" style={{ padding: 12 }}>
             <div className="row between"><span className="eyebrow" style={{ margin: 0 }}>Game {g.n}{g.sidesSwapped ? ' · sides swapped' : ''}</span><b className="num" style={{ fontSize: 20 }}>{g.homeGoals}–{g.awayGoals}</b></div>
             <div className="grid-2 small" style={{ gap: 4, marginTop: 6 }}>
-              <div>{scorers.filter(([, s]) => s.teamId === m.homeTeamId).map(([pid, s]) => <div key={pid} style={{ cursor: 'pointer' }} onClick={() => open({ kind: 'player', id: pid })}>⚽ {name(pid)}<Flag country={L.players[pid]?.country} />{s.goals! > 1 ? ` ×${s.goals}` : ''}{s.mvp ? ' ⭐' : ''}</div>)}</div>
-              <div className="right">{scorers.filter(([, s]) => s.teamId === m.awayTeamId).map(([pid, s]) => <div key={pid} style={{ cursor: 'pointer' }} onClick={() => open({ kind: 'player', id: pid })}>{s.mvp ? '⭐ ' : ''}<Flag country={L.players[pid]?.country} /> {name(pid)}{s.goals! > 1 ? ` ×${s.goals}` : ''} ⚽</div>)}</div>
+              <div>{scorers.filter(([, s]) => s.teamId === m.homeTeamId).map(([pid, s]) => <div key={pid} style={{ cursor: 'pointer' }} onClick={() => open({ kind: 'player', id: pid })}><Goal size={13} aria-hidden /> {name(pid)}<Flag country={L.players[pid]?.country} />{s.goals! > 1 ? ` ×${s.goals}` : ''}{s.mvp ? <Star size={12} aria-label="MVP" style={{ marginLeft: 4 }} /> : ''}</div>)}</div>
+              <div className="right">{scorers.filter(([, s]) => s.teamId === m.awayTeamId).map(([pid, s]) => <div key={pid} style={{ cursor: 'pointer' }} onClick={() => open({ kind: 'player', id: pid })}>{s.mvp ? <Star size={12} aria-label="MVP" style={{ marginRight: 4 }} /> : ''}<Flag country={L.players[pid]?.country} /> {name(pid)}{s.goals! > 1 ? ` ×${s.goals}` : ''} <Goal size={13} aria-hidden /></div>)}</div>
             </div>
           </div>
         );
@@ -57,7 +58,7 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
       {m.status !== 'played' && <p className="center muted">{m.status === 'agreed' ? `Kickoff agreed: ${fmtDateTime(m.kickoffAt)}` : 'Kickoff to be agreed by the captains.'}</p>}
       {m.status !== 'played' && m.status !== 'void' && canKickoff && (
         <div className="card stack" style={{ padding: 12 }}>
-          <div className="eyebrow" style={{ margin: 0 }}>🕒 Captain: set the kickoff time</div>
+          <div className="eyebrow" style={{ margin: 0 }}><Clock size={12} aria-hidden /> Captain: set the kickoff time</div>
           <KickoffEditor m={m} seasonId={cupId ? undefined : seasonId || L.seasonId!} cupId={cupId} />
           <span className="small muted">Times are in your local timezone.</span>
         </div>
@@ -68,10 +69,10 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
       {canUpload && (
         <div className="row wrap" style={{ justifyContent: 'center' }}>
           <input className="input" style={{ maxWidth: 360 }} placeholder="Screenshot link (Discord attachment or https://…)" value={shot} onChange={(e) => setShot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && shot.trim() && addShot()} />
-          <button className="btn sm" disabled={busy || !shot.trim()} onClick={addShot}>📷 {screenshot ? 'Replace screenshot' : 'Add screenshot'}</button>
+          <button className="btn sm" disabled={busy || !shot.trim()} onClick={addShot}><Camera size={15} aria-hidden />{screenshot ? 'Replace screenshot' : 'Add screenshot'}</button>
         </div>
       )}
-      {L.isAdmin && <div className="row" style={{ justifyContent: 'center' }}><a className="btn sm" href={`#admin/result?${cupId ? `cup=${cupId}&` : ''}match=${id}`}>🛠️ Edit result</a></div>}
+      {L.isAdmin && <div className="row" style={{ justifyContent: 'center' }}><a className="btn sm" href={`#admin/result?${cupId ? `cup=${cupId}&` : ''}match=${id}`}><Wrench size={15} aria-hidden />Edit result</a></div>}
     </div>
   );
 }

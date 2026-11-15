@@ -6,9 +6,10 @@ import { useDoc, go } from '../lib/hooks';
 import { PageHeader, Tabs, Empty, Crest, Avatar, Skeleton, Flag } from '../components/ui';
 import { useModal } from '../modals/ModalContext';
 import type { Award, RecordsDoc } from '../lib/types';
+import { Award as AwardBadge, ScrollText, Trophy } from 'lucide-react';
+import { AwardIcon } from '../components/icons';
 
 type Tab = 'trophies' | 'records' | 'milestones';
-const AWARD_EMOJI: Record<string, string> = { champion: '🏆', golden_boot: '👟', playmaker: '🎯', golden_glove: '🧤', mvp: '⭐', custom: '🏅' };
 
 export default function AwardsPage({ sub }: { sub: string }) {
   const tab = (['trophies', 'records', 'milestones'].includes(sub) ? sub : 'trophies') as Tab;
@@ -17,7 +18,7 @@ export default function AwardsPage({ sub }: { sub: string }) {
     <PageHeader eyebrow="Hall of fame" title="Awards &" accent="records" />
     <main className="page">
       <section>
-        <Tabs tabs={[{ key: 'trophies', label: 'Trophies', emoji: '🏆' }, { key: 'records', label: 'Records', emoji: '📜' }, { key: 'milestones', label: 'Milestones', emoji: '🎖️' }]}
+        <Tabs tabs={[{ key: 'trophies', label: 'Trophies', icon: Trophy }, { key: 'records', label: 'Records', icon: ScrollText }, { key: 'milestones', label: 'Milestones', icon: AwardBadge }]}
           active={tab} onChange={(k) => go(`awards/${k}`)} />
         {tab === 'trophies' && <Trophies />}
         {tab === 'records' && <Records />}
@@ -50,7 +51,7 @@ function Trophies() {
               const p = isP ? L.players[a.recipientId] : null, t = !isP ? L.teams[a.recipientId] : null;
               return (
                 <div key={a.id} className="card row" style={{ cursor: 'pointer' }} onClick={() => open(isP ? { kind: 'player', id: a.recipientId } : { kind: 'team', id: a.recipientId })}>
-                  <span style={{ fontSize: 32 }}>{AWARD_EMOJI[a.type] || '🏅'}</span>
+                  <span style={{ fontSize: 32, display: 'inline-flex' }}><AwardIcon type={a.type} size={32} /></span>
                   <div className="grow">
                     <div className="eyebrow" style={{ margin: 0 }}>{a.label}</div>
                     <div className="row">{isP ? <Avatar src={p?.avatarUrl} name={p?.name} size="sm" /> : <Crest team={t} size="sm" />}<b>{p?.name || t?.name || 'Unknown'}</b>{p && <Flag country={p.country} />}</div>
@@ -100,7 +101,7 @@ function Milestones() {
     <div className="grid-3">
       {data.milestones.map((m) => (
         <div key={m.key + m.holderId} className="card row" style={{ cursor: 'pointer' }} onClick={() => open({ kind: 'player', id: m.holderId })}>
-          <span style={{ fontSize: 28 }}>🎖️</span>
+          <AwardBadge size={28} aria-hidden />
           <div><div className="eyebrow" style={{ margin: 0 }}>{m.label}</div><b>{L.players[m.holderId]?.name}</b><Flag country={L.players[m.holderId]?.country} /> <span className="muted small">({m.value})</span></div>
         </div>
       ))}

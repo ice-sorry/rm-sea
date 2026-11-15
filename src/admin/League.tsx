@@ -8,6 +8,7 @@ import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Position, Team, Player } from '../lib/types';
 import { actor, normalizeTeamName, notifyRosterMove, syncTeamRoles } from './util';
 import { normalizeImageLink } from '../lib/images';
+import { Check, RefreshCw } from 'lucide-react';
 
 // ======================= Teams =======================
 const blankTeam = { name: '', shortName: '', color: '#1D8ADE', crestUrl: '', discordRoleId: '', captainIds: [] as string[], active: true };
@@ -67,7 +68,7 @@ export function AdminTeams() {
               <td className="small muted">{t.discordRoleId || '—'}</td>
               <td className="small">{(t.captainIds || []).map((c) => L.players[c]?.name).join(', ') || '—'}</td>
               <td>{(L.rosters[t.id] || []).length}</td>
-              <td>{t.active !== false ? '✅' : '—'}</td>
+              <td>{t.active !== false ? <Check size={16} aria-label="Active" /> : '—'}</td>
               <td className="right"><button className="btn sm" onClick={() => setEdit({ ...blankTeam, ...t, discordRoleId: t.discordRoleId || '', captainIds: t.captainIds || [] })}>Edit</button></td>
             </tr>
           ))}</tbody>
@@ -103,7 +104,7 @@ export function AdminPlayers() {
   return (
     <>
       <SectionHeader eyebrow="League" title="Players" accent="& Discord links"
-        right={<button className="btn sm" disabled={busy} onClick={() => run(() => call<unknown, { checked: number; updated: number }>('refreshAvatars')({}), (r) => `Checked ${r.checked}, updated ${r.updated} avatars`)}>🔄 Refresh avatars</button>} />
+        right={<button className="btn sm" disabled={busy} onClick={() => run(() => call<unknown, { checked: number; updated: number }>('refreshAvatars')({}), (r) => `Checked ${r.checked}, updated ${r.updated} avatars`)}><RefreshCw size={15} aria-hidden />Refresh avatars</button>} />
       <div className="card stack">
         <h3>+ Add player</h3>
         <div className="form-grid">

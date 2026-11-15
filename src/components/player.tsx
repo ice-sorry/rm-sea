@@ -10,9 +10,9 @@ import { SectionHeader, Empty, Crest, Avatar, Field, Flag, CountrySelect, useAct
 import { SignInButton } from './Shell';
 import { fmtAgo, fmtDateTime, toLocalInput, ms } from '../lib/format';
 import { normalizeImageLink } from '../lib/images';
-import { Palette } from 'lucide-react';
 import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Entry, MatchDoc, Position, RequestDoc } from '../lib/types';
+import { Bell, CircleCheck, Palette, Clock, DoorOpen, Inbox, Landmark, Lock, Pencil, Repeat, UserPlus } from 'lucide-react';
 
 // ---------- Own profile: edit ----------
 export function ProfileEditor() {
@@ -21,7 +21,7 @@ export function ProfileEditor() {
   const [f, setF] = useState({ name: p.name, position: p.position, bio: p.bio || '', country: p.country || '' });
   const { run, busy } = useAction();
   const [openEd, setOpen] = useState(false);
-  if (!openEd) return <button className="btn" onClick={() => setOpen(true)}>✏️ Edit profile</button>;
+  if (!openEd) return <button className="btn" onClick={() => setOpen(true)}><Pencil size={15} aria-hidden />Edit profile</button>;
   return (
     <section className="card stack">
       <h3>Edit profile</h3>
@@ -50,7 +50,7 @@ export function MyRequests() {
   const { data: mine } = useCol<RequestDoc>('requests', where('requestedBy', '==', uid));
   return (
     <section className="card">
-      <h3>📨 My requests</h3>
+      <h3><Inbox size={18} aria-hidden />My requests</h3>
       {!mine.length && <Empty>No requests yet. Open a team's page to ask to join.</Empty>}
       {[...mine].sort((a, b) => ms(b.createdAt) - ms(a.createdAt)).map((r) => (
         <div key={r.id} className="row" style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
@@ -85,13 +85,13 @@ export function JoinTeamButton({ teamId }: { teamId: string }) {
   const { data: mine } = useCol<RequestDoc>(L.authUser ? 'requests' : null, where('requestedBy', '==', L.authUser?.uid || '-'));
   if (team?.active === false) return null;
   if (!L.authUser) return <SignInButton />;
-  if (!p) return <a className="btn" href="#me">🙋 Set up my player</a>;
+  if (!p) return <a className="btn" href="#me"><UserPlus size={15} aria-hidden />Set up my player</a>;
   if (p.currentTeamId === teamId) return null;
   const pending = mine.find((r) => r.status === 'pending' && r.toTeamId === teamId);
   if (pending) return <span className="badge warn" style={{ fontSize: 13, padding: '6px 12px' }}>Request pending</span>;
-  if (L.general.transfersBlocked) return <span className="badge" style={{ fontSize: 13, padding: '6px 12px' }} title="An admin has closed the transfer window">🔒 Transfers closed</span>;
+  if (L.general.transfersBlocked) return <span className="badge" style={{ fontSize: 13, padding: '6px 12px' }} title="An admin has closed the transfer window"><Lock size={13} aria-hidden />Transfers closed</span>;
   const transfer = !!p.currentTeamId;
-  if (!openForm) return <button className="btn primary" onClick={() => setOpen(true)}>{transfer ? '🔁 Request transfer' : '🙋 Request to join'}</button>;
+  if (!openForm) return <button className="btn primary" onClick={() => setOpen(true)}>{transfer ? <><Repeat size={15} aria-hidden />Request transfer</> : <><UserPlus size={15} aria-hidden />Request to join</>}</button>;
   return (
     <span className="row wrap">
       <input className="input" style={{ maxWidth: 260 }} placeholder="Message to the captain (optional)" value={message} maxLength={200} onChange={(e) => setMessage(e.target.value)} />
@@ -141,7 +141,7 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
       <TeamIdentityCard teamId={teamId} />
       <div className="grid-2">
         <div className="card">
-          <h3>🔔 Join & transfer requests</h3>
+          <h3><Bell size={18} aria-hidden />Join & transfer requests</h3>
           {!reqs.length && <Empty>No pending requests.</Empty>}
           {reqs.map((r) => (
             <div key={r.id} className="row" style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
@@ -153,7 +153,7 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
           ))}
         </div>
         <div className="card">
-          <h3>🕒 Agree kickoff times</h3>
+          <h3><Clock size={18} aria-hidden />Agree kickoff times</h3>
           {!fixtures.length && <Empty>No upcoming fixtures.</Empty>}
           {fixtures.map((m) => (
             <div key={m.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
@@ -243,9 +243,9 @@ function SeasonEntryCard({ teamId }: { teamId: string }) {
   }, 'Request sent to the admins');
   return (
     <div className="card stack" style={{ marginBottom: 'var(--s4)' }}>
-      <h3>🏟️ {season.name}</h3>
+      <h3><Landmark size={18} aria-hidden />{season.name}</h3>
       {loading ? <span className="small muted">Loading…</span> : (
-        <span className="small">{entered ? <>✅ {team?.name} is entered{entry?.confirmed === false ? ' (awaiting confirmation)' : ''}.</> : <>{team?.name} is not entered in this season.</>}</span>
+        <span className="small">{entered ? <><CircleCheck size={14} aria-hidden /> {team?.name} is entered{entry?.confirmed === false ? ' (awaiting confirmation)' : ''}.</> : <>{team?.name} is not entered in this season.</>}</span>
       )}
       {pending ? (
         <div className="row wrap">
@@ -258,8 +258,8 @@ function SeasonEntryCard({ teamId }: { teamId: string }) {
         <div className="row wrap">
           <input className="input" style={{ maxWidth: 300 }} placeholder="Message to the admins (optional)" value={message} maxLength={200} onChange={(e) => setMessage(e.target.value)} />
           {entered
-            ? <button className="btn" disabled={busy} onClick={() => send('leave_season')}>🚪 Request to leave</button>
-            : <button className="btn primary" disabled={busy} onClick={() => send('join_season')}>🙋 Request to join</button>}
+            ? <button className="btn" disabled={busy} onClick={() => send('leave_season')}><DoorOpen size={15} aria-hidden />Request to leave</button>
+            : <button className="btn primary" disabled={busy} onClick={() => send('join_season')}><UserPlus size={15} aria-hidden />Request to join</button>}
         </div>
       ) : L.isAdmin ? (
         <span className="small muted">Admins add or remove teams under <a href="#admin/season">Admin → Season → Teams &amp; divisions</a>.</span>

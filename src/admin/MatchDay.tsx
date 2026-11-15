@@ -9,6 +9,7 @@ import { fmtDateTime, toLocalInput } from '../lib/format';
 import { matchweekOf, summarizeSeries, groupBy, DEFAULT_SEASON, STAT_KEYS, STAT_LABELS } from '../lib/types';
 import type { Game, MatchDoc, PlayerGameStats, Cup } from '../lib/types';
 import { afterMatchChange, newMatchDoc, stamp } from './util';
+import { CircleCheck, Flag, Lock, Megaphone, MessagesSquare, Plus, RefreshCw, Save, Settings, TriangleAlert, Trophy, X } from 'lucide-react';
 
 const STAT_FIELDS = STAT_KEYS;
 const blankLine = (teamId: string): PlayerGameStats => ({ teamId, goals: 0, assists: 0, interceptions: 0, passes: 0, saves: 0 });
@@ -28,7 +29,7 @@ export function AddResult({ params }: { params: URLSearchParams }) {
   return (
     <>
       <SectionHeader eyebrow={cupId ? 'Cup result' : `Match Day · ${L.season?.name || ''}`} title="Add" accent="result" />
-      {L.season?.locked && !cupId && <div className="card"><b>🔒 This season is locked.</b> Unlock it in Season settings to edit results.</div>}
+      {L.season?.locked && !cupId && <div className="card"><b><Lock size={15} aria-hidden /> This season is locked.</b> Unlock it in Season settings to edit results.</div>}
       <Field label="Match">
         <select className="select" value={matchId} onChange={(e) => go(`admin/result?${cupId ? `cup=${cupId}&` : ''}match=${e.target.value}`)}>
           <option value="">Pick a fixture…</option>
@@ -97,7 +98,7 @@ function ResultEditor({ m, path }: { m: MatchDoc; path: string }) {
         </div>
         <div className="center small" style={{ marginTop: 6 }}>
           {sum.complete ? <span className="badge ok">Series complete</span> : <span className="badge warn">Game {games.length + 1} needed ({fmt.rule}, {fmt.minGames}–{fmt.maxGames} games)</span>}
-          {m.verification === 'check' && <span className="badge warn" style={{ marginLeft: 6 }}>⚠️ {(m.verificationIssues || []).join('; ')}</span>}
+          {m.verification === 'check' && <span className="badge warn" style={{ marginLeft: 6 }}><TriangleAlert size={12} aria-hidden />{(m.verificationIssues || []).join('; ')}</span>}
         </div>
       </div>
 
@@ -112,7 +113,7 @@ function ResultEditor({ m, path }: { m: MatchDoc; path: string }) {
             <input className="input num-in" type="number" min={0} value={g.awayGoals} onChange={(e) => setGame(i, { awayGoals: Number(e.target.value) })} />
             <span className="small muted">{L.teams[m.awayTeamId]?.shortName}</span>
             <label className="check small"><input type="checkbox" checked={!!g.sidesSwapped} onChange={(e) => setGame(i, { sidesSwapped: e.target.checked })} />sides swapped</label>
-            <button className="btn sm ghost" onClick={() => setGames(games.filter((_, j) => j !== i))}>✕</button>
+            <button className="btn sm ghost" onClick={() => setGames(games.filter((_, j) => j !== i))} aria-label="Remove game"><X size={14} /></button>
           </div>
           {openGame === i && sides.map((teamId) => (
             <div key={teamId} className="table-wrap" style={{ marginTop: 10 }}>
@@ -154,8 +155,8 @@ function ResultEditor({ m, path }: { m: MatchDoc; path: string }) {
         <Field label="Date played"><input className="input" type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       </div>
       <div className="row wrap">
-        <button className="btn primary" disabled={busy || !games.length} onClick={save}>💾 Save result</button>
-        {m.verification === 'check' && <button className="btn" disabled={busy} onClick={() => run(async () => { await updateDoc(doc(db, path), { verifiedOverride: true, verification: 'ok', ...stamp() }); await afterMatchChange(path); }, 'Marked verified')}>✅ Mark verified</button>}
+        <button className="btn primary" disabled={busy || !games.length} onClick={save}><Save size={15} aria-hidden />Save result</button>
+        {m.verification === 'check' && <button className="btn" disabled={busy} onClick={() => run(async () => { await updateDoc(doc(db, path), { verifiedOverride: true, verification: 'ok', ...stamp() }); await afterMatchChange(path); }, 'Marked verified')}><CircleCheck size={15} aria-hidden />Mark verified</button>}
         {m.status === 'played' && <Confirm text="Clear this result? Standings and brackets roll back." onYes={() => run(async () => { await updateDoc(doc(db, path), { status: m.kickoffAt ? 'agreed' : 'scheduled', games: [], mvpPlayerId: null, winnerTeamId: null, verifiedOverride: false, ...stamp() }); await afterMatchChange(path); }, 'Result cleared')}>Clear result</Confirm>}
       </div>
     </div>
@@ -180,7 +181,7 @@ export function AdminFixtures() {
       <SectionHeader eyebrow="Match Day" title="Fixtures &" accent="schedule" />
       <div className="grid-2">
         <div className="card stack">
-          <h3>⚙️ Generate schedule</h3>
+          <h3><Settings size={18} aria-hidden />Generate schedule</h3>
           <p className="small muted">Circle-method round-robin over confirmed entries. Odd counts get byes; divisions share round numbers. Top-up adds missing pairings for late teams in new rounds.</p>
           <div className="row wrap">
             <label className="check"><input type="radio" checked={gen.double} onChange={() => setGen({ ...gen, double: true })} />Double</label>
@@ -193,7 +194,7 @@ export function AdminFixtures() {
           <button className="btn primary" disabled={busy || !L.seasonId} onClick={() => run(() => call<unknown, { created: number; rounds: number }>('generateSchedule')({ seasonId: L.seasonId, ...gen }), (r) => `Created ${r.created} fixtures over ${r.rounds} rounds`)}>Generate</button>
         </div>
         <div className="card stack">
-          <h3>➕ Add fixture</h3>
+          <h3><Plus size={18} aria-hidden />Add fixture</h3>
           <div className="form-grid">
             <Field label="Home"><select className="select" value={add.home} onChange={(e) => setAdd({ ...add, home: e.target.value })}><option value="">—</option>{L.teamList.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></Field>
             <Field label="Away"><select className="select" value={add.away} onChange={(e) => setAdd({ ...add, away: e.target.value })}><option value="">—</option>{L.teamList.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></Field>
@@ -218,15 +219,15 @@ export function AdminFixtures() {
               {wd?.publishedAt ? <span className="badge ok">Threads published</span> : null}
               {wd?.completedAt ? <span className="badge">Completed</span> : null}
               <span className="grow" />
-              <button className="btn sm" disabled={busy} onClick={() => run(() => call<unknown, { threads: number }>('publishMatchweek')({ seasonId: L.seasonId, weekNo: Number(w) }), (r) => `${r.threads} match threads ready`)}>📣 Publish threads</button>
-              <button className="btn sm" disabled={busy} onClick={() => run(() => call<unknown, { renamed: number }>('completeMatchweek')({ seasonId: L.seasonId, weekNo: Number(w) }), (r) => `Renamed ${r.renamed} threads to COMPLETED`)}>🏁 Mark completed</button>
+              <button className="btn sm" disabled={busy} onClick={() => run(() => call<unknown, { threads: number }>('publishMatchweek')({ seasonId: L.seasonId, weekNo: Number(w) }), (r) => `${r.threads} match threads ready`)}><Megaphone size={15} aria-hidden />Publish threads</button>
+              <button className="btn sm" disabled={busy} onClick={() => run(() => call<unknown, { renamed: number }>('completeMatchweek')({ seasonId: L.seasonId, weekNo: Number(w) }), (r) => `Renamed ${r.renamed} threads to COMPLETED`)}><Flag size={15} aria-hidden />Mark completed</button>
             </div>
             <div className="table-wrap"><table className="data">
               <thead><tr><th>R</th><th>Match</th><th>Status</th><th>Kickoff (local)</th><th /></tr></thead>
               <tbody>{ms.sort((a, b) => a.round - b.round).map((m) => (
                 <tr key={m.id}>
                   <td>{m.round}</td>
-                  <td>{name(m.homeTeamId)} vs {name(m.awayTeamId)}{m.discordThreadId ? ' 🧵' : ''}</td>
+                  <td>{name(m.homeTeamId)} vs {name(m.awayTeamId)}{m.discordThreadId ? <MessagesSquare size={14} aria-label="Has a Discord thread" style={{ marginLeft: 6 }} /> : ''}</td>
                   <td>{m.status === 'played' ? <b>{m.seriesHome}–{m.seriesAway}</b> : m.status}</td>
                   <td>
                     {m.status === 'played' ? fmtDateTime(m.matchDate) : (
@@ -242,7 +243,7 @@ export function AdminFixtures() {
                   </td>
                   <td className="right">
                     <a className="btn sm" href={`#admin/result?match=${m.id}`}>Result</a>{' '}
-                    {m.status !== 'played' && <Confirm text="Delete this fixture?" onYes={() => run(async () => { const p = `seasons/${L.seasonId}/matches/${m.id}`; await deleteDoc(doc(db, p)); await afterMatchChange(p, false); }, 'Fixture deleted')}>✕</Confirm>}
+                    {m.status !== 'played' && <Confirm text="Delete this fixture?" onYes={() => run(async () => { const p = `seasons/${L.seasonId}/matches/${m.id}`; await deleteDoc(doc(db, p)); await afterMatchChange(p, false); }, 'Fixture deleted')}><X size={14} aria-label="Delete fixture" /></Confirm>}
                   </td>
                 </tr>
               ))}</tbody>
@@ -270,7 +271,7 @@ export function AdminResults() {
       <div className="row wrap">
         <label className="check"><input type="checkbox" checked={onlyCheck} onChange={(e) => setOnlyCheck(e.target.checked)} />Only flagged for review</label>
         <span className="grow" />
-        <button className="btn sm" onClick={() => run(() => call('recomputeAll')({ seasonId: L.seasonId }), 'Recomputed standings, stats and brackets')}>♻️ Recompute season</button>
+        <button className="btn sm" onClick={() => run(() => call('recomputeAll')({ seasonId: L.seasonId }), 'Recomputed standings, stats and brackets')}><RefreshCw size={15} aria-hidden />Recompute season</button>
       </div>
       <div className="card flush table-wrap">
         <table className="data">
@@ -299,7 +300,7 @@ function CupResults({ cup }: { cup: Cup }) {
   const { data: ms } = useCol<MatchDoc>(`cups/${cup.id}/matches`);
   return (
     <div className="card">
-      <h3>🏆 {cup.name}</h3>
+      <h3><Trophy size={18} aria-hidden />{cup.name}</h3>
       {!ms.length && <Empty>No cup matches yet.</Empty>}
       {ms.sort((a, b) => a.round - b.round).map((m) => (
         <div key={m.id} className="row small" style={{ padding: '4px 0' }}>

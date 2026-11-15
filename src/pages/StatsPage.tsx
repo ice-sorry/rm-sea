@@ -9,13 +9,14 @@ import { useModal } from '../modals/ModalContext';
 import { pct, signed } from '../lib/format';
 import { LEADER_CATEGORIES, STAT_KEYS, STAT_LABELS, gamePoints } from '../lib/types';
 import type { MatchDoc, PlayerStatRow, RecordsDoc, TeamStatRow } from '../lib/types';
+import { Brain, ChartLine, Scale, Shield, Sparkles, Target, User, type LucideIcon } from 'lucide-react';
 
 type Tab = 'overview' | 'players' | 'teams' | 'h2h';
-const TABS: { key: Tab; label: string; emoji: string }[] = [
-  { key: 'overview', label: 'Overview', emoji: '✨' },
-  { key: 'players', label: 'Players', emoji: '👤' },
-  { key: 'teams', label: 'Teams', emoji: '🛡️' },
-  { key: 'h2h', label: 'H2H', emoji: '⚖️' },
+const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
+  { key: 'overview', label: 'Overview', icon: Sparkles },
+  { key: 'players', label: 'Players', icon: User },
+  { key: 'teams', label: 'Teams', icon: Shield },
+  { key: 'h2h', label: 'H2H', icon: Scale },
 ];
 
 export default function StatsPage({ sub }: { sub: string }) {
@@ -134,12 +135,12 @@ function Overview() {
         {LEADER_CATEGORIES.slice(0, 6).map((c) => <LeaderList key={c.key} category={c.key} entries={L.leaders?.categories?.[c.key]} />)}
       </div>
       <div className="card">
-        <h3>📈 Round-by-round race</h3>
+        <h3><ChartLine size={18} aria-hidden />Round-by-round race</h3>
         {race.rounds.length ? <LineChart series={race.series} maxY={race.maxY} xLabels={race.rounds.map((r) => `R${r}`)} /> : <Empty>No rounds played yet.</Empty>}
       </div>
       <div className="grid-2">
         <div className="card">
-          <h3>🎯 Record Watch</h3>
+          <h3><Target size={18} aria-hidden />Record Watch</h3>
           {!watch.length ? <Empty>Records appear after the first results.</Empty> : watch.map((w) => (
             <div key={w.label} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => open({ kind: 'player', id: w.chaser })}>
               <div className="row between small"><span className="muted">{w.label}</span><span>Record: <b>{w.record}</b> · {L.players[w.holder]?.name}{w.holderSeason ? ` (${w.holderSeason})` : ''}</span></div>
@@ -149,7 +150,7 @@ function Overview() {
           ))}
         </div>
         <div className="card">
-          <h3>⚖️ Per-game scaled <span className="small muted">(min {minGp} games)</span></h3>
+          <h3><Scale size={18} aria-hidden />Per-game scaled <span className="small muted">(min {minGp} games)</span></h3>
           {(['goals', 'assists', 'interceptions', 'saves'] as const).map((k) => (
             <div key={k} style={{ marginBottom: 8 }}>
               <div className="eyebrow">{STAT_LABELS[k]} per game</div>
@@ -160,7 +161,7 @@ function Overview() {
         </div>
       </div>
       <div className="card flush">
-        <div style={{ padding: 16, paddingBottom: 0 }}><h3>🧠 Advanced metrics</h3></div>
+        <div style={{ padding: 16, paddingBottom: 0 }}><h3><Brain size={18} aria-hidden />Advanced metrics</h3></div>
         <SortTable rows={qualified} initial="contrib" rowKey={(r) => r.playerId} onRow={(r) => open({ kind: 'player', id: r.playerId })} cols={[
           pcols[0],
           { key: 'contrib', label: 'G+A / game', get: (r) => r.adv.contribPg, num: true },
@@ -168,7 +169,7 @@ function Overview() {
           { key: 'mvpRate', label: 'MVP / series', get: (r) => r.adv.mvpRate, num: true },
         ]} />
       </div>
-      <div className="card flush"><div style={{ padding: 16, paddingBottom: 0 }}><h3>🛡️ Team stats</h3></div><TeamsTable compact /></div>
+      <div className="card flush"><div style={{ padding: 16, paddingBottom: 0 }}><h3><Shield size={18} aria-hidden />Team stats</h3></div><TeamsTable compact /></div>
       <div className="row"><a className="btn" href="#stats/players">Full player stats →</a><a className="btn" href="#stats/teams">Full team stats →</a></div>
     </div>
   );

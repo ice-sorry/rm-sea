@@ -7,9 +7,9 @@ import { PageHeader, Crest, Empty, Skeleton, Field, useAction } from '../compone
 import { SignInButton } from '../components/Shell';
 import { teamHref } from '../modals/ModalContext';
 import type { Award } from '../lib/types';
-import { Crown, Users } from 'lucide-react';
+import { AwardIcon } from '../components/icons';
+import { Crown, Lock, Plus, Users } from 'lucide-react';
 
-const AWARD_EMOJI: Record<string, string> = { champion: '🏆', golden_boot: '👟', playmaker: '🎯', golden_glove: '🧤', mvp: '⭐', custom: '🏅' };
 
 export default function TeamsPage() {
   const L = useLeague();
@@ -26,7 +26,7 @@ export default function TeamsPage() {
   return (
     <>
       <PageHeader eyebrow={`${teams.length} clubs`} title="Teams"
-        right={<button className="btn primary" onClick={() => setCreating(!creating)}>➕ Create team</button>} />
+        right={<button className="btn primary" onClick={() => setCreating(!creating)}><Plus size={16} aria-hidden />Create team</button>} />
       <main className="page">
         {creating && <CreateTeam onDone={() => setCreating(false)} />}
         {!L.ready ? <Skeleton /> : !teams.length ? <Empty>No teams yet.</Empty> : (
@@ -47,7 +47,7 @@ export default function TeamsPage() {
                     </div>
                     {mine.length > 0 && (
                       <div className="team-awards">
-                        {mine.map((a) => <span key={a.seasonName + a.id} className="badge warn">{AWARD_EMOJI[a.type] || '🏅'} {a.label} · {a.seasonName}</span>)}
+                        {mine.map((a) => <span key={a.seasonName + a.id} className="badge warn"><AwardIcon type={a.type} />{a.label} · {a.seasonName}</span>)}
                       </div>
                     )}
                   </div>
@@ -76,7 +76,7 @@ function CreateTeam({ onDone }: { onDone: () => void }) {
       ) : !p ? (
         <p className="muted" style={{ margin: 0 }}>Set up your player first. <a href="#me">Set up my player →</a></p>
       ) : L.general.transfersBlocked ? (
-        <p className="muted" style={{ margin: 0 }}>🔒 Transfers are closed right now, so new clubs can't be requested. Check back when an admin reopens the window.</p>
+        <p className="muted" style={{ margin: 0 }}><Lock size={14} aria-hidden /> Transfers are closed right now, so new clubs can't be requested. Check back when an admin reopens the window.</p>
       ) : (
         <>
           <Field label="Club name"><input className="input" value={f.name} maxLength={40} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>

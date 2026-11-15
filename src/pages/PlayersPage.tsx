@@ -8,8 +8,8 @@ import { SortTable, Col } from './StatsPage';
 import { findCountry } from '../lib/countries';
 import { POSITION_LABELS } from '../lib/types';
 import type { Award, Player } from '../lib/types';
+import { AwardIcon } from '../components/icons';
 
-const AWARD_EMOJI: Record<string, string> = { champion: '🏆', golden_boot: '👟', playmaker: '🎯', golden_glove: '🧤', mvp: '⭐', custom: '🏅' };
 interface Row { player: Player; awards: (Award & { seasonName: string })[] }
 
 /** #players: a directory of every player (position, current team, country), with their awards under the name. */
@@ -42,7 +42,7 @@ export default function PlayersPage() {
         <div style={{ minWidth: 200 }}>
           <span className="row"><Avatar src={r.player.avatarUrl} name={r.player.name} size="sm" /><b>{r.player.name}</b></span>
           {r.awards.length > 0 && (
-            <div className="player-awards">{r.awards.map((a) => <span key={a.seasonName + a.id} className="badge warn" title={a.value != null ? String(a.value) : undefined}>{AWARD_EMOJI[a.type] || '🏅'} {a.label} · {a.seasonName}</span>)}</div>
+            <div className="player-awards">{r.awards.map((a) => <span key={a.seasonName + a.id} className="badge warn" title={a.value != null ? String(a.value) : undefined}><AwardIcon type={a.type} />{a.label} · {a.seasonName}</span>)}</div>
           )}
         </div>
       ),

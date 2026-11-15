@@ -6,17 +6,18 @@ import { useLeague, reloadClaims } from '../lib/league';
 import { useCol, useDoc, go } from '../lib/hooks';
 import { SectionHeader, Empty, Field, useAction, Confirm, Tabs } from '../components/ui';
 import { fmtAgo, fmtDateTime } from '../lib/format';
+import { Bot, Bug, ChartLine, Dna, FileSearch, KeyRound, Keyboard, Link, Receipt, RefreshCw, RotateCcw, Save, Tag } from 'lucide-react';
 
 const TABS = [
-  { key: 'general', label: 'General', emoji: '🏷️' },
-  { key: 'discord', label: 'Discord & roles', emoji: '🤖' },
-  { key: 'webhooks', label: 'Webhooks', emoji: '🔗' },
-  { key: 'analytics', label: 'Analytics', emoji: '📈' },
-  { key: 'errors', label: 'Client errors', emoji: '🐞' },
-  { key: 'audit', label: 'Audit log', emoji: '🧾' },
-  { key: 'backup', label: 'Backup', emoji: '💾' },
-  { key: 'merge', label: 'Merge duplicates', emoji: '🧬' },
-  { key: 'admins', label: 'Admins', emoji: '🔑' },
+  { key: 'general', label: 'General', icon: Tag },
+  { key: 'discord', label: 'Discord & roles', icon: Bot },
+  { key: 'webhooks', label: 'Webhooks', icon: Link },
+  { key: 'analytics', label: 'Analytics', icon: ChartLine },
+  { key: 'errors', label: 'Client errors', icon: Bug },
+  { key: 'audit', label: 'Audit log', icon: Receipt },
+  { key: 'backup', label: 'Backup', icon: Save },
+  { key: 'merge', label: 'Merge duplicates', icon: Dna },
+  { key: 'admins', label: 'Admins', icon: KeyRound },
 ];
 
 export function AdminSettings({ tab }: { tab: string }) {
@@ -83,9 +84,9 @@ function Discord() {
         <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/integrations'), f, { merge: true }), 'Saved')}>Save</button>
       </div>
       <div className="card row wrap">
-        <button className="btn" disabled={busy} onClick={() => run(() => call<unknown, { added: number; removed: number }>('syncRoles')({}), (r) => `Roles synced: ${r.added} added, ${r.removed} removed`)}>🔄 Sync team roles</button>
-        <button className="btn" disabled={busy} onClick={() => run(() => call('registerCommands')({}), 'Registered /standings and /next')}>⌨️ Register slash commands</button>
-        <button className="btn" disabled={busy} onClick={() => run(async () => { await call('refreshClaims')({}); await reloadClaims(); })}>🔑 Refresh my claims</button>
+        <button className="btn" disabled={busy} onClick={() => run(() => call<unknown, { added: number; removed: number }>('syncRoles')({}), (r) => `Roles synced: ${r.added} added, ${r.removed} removed`)}><RefreshCw size={15} aria-hidden />Sync team roles</button>
+        <button className="btn" disabled={busy} onClick={() => run(() => call('registerCommands')({}), 'Registered /standings and /next')}><Keyboard size={15} aria-hidden />Register slash commands</button>
+        <button className="btn" disabled={busy} onClick={() => run(async () => { await call('refreshClaims')({}); await reloadClaims(); })}><KeyRound size={15} aria-hidden />Refresh my claims</button>
       </div>
       <p className="small muted">Interactions endpoint for the Discord app: <code>{API_URL || 'https://<your-worker>.workers.dev'}/interactions</code></p>
     </div>
@@ -138,7 +139,7 @@ function Errors() {
   const { data } = useCol<{ message: string; stack: string; url: string; userAgent: string; uid: string | null; firstAt: { toMillis(): number } }>('clientErrors', orderBy('firstAt', 'desc'), limit(50));
   return (
     <div className="stack">
-      {!data.length && <Empty>No client errors reported. 🎉</Empty>}
+      {!data.length && <Empty>No client errors reported.</Empty>}
       {data.map((e) => (
         <details key={e.id} className="card">
           <summary style={{ cursor: 'pointer' }}><b>{e.message}</b> <span className="small muted">· {fmtAgo(e.firstAt)} · {e.uid || 'anonymous'}</span></summary>
@@ -204,14 +205,14 @@ function Backup() {
   return (
     <div className="stack">
       <div className="card row wrap">
-        <button className="btn primary" disabled={busy} onClick={() => run(async () => { const r = await call<unknown, { total: number; json: string }>('backupNow')({}); download(r.json); return r; }, (r) => `Backed up ${r.total} documents — a copy was downloaded`)}>💾 Back up now</button>
+        <button className="btn primary" disabled={busy} onClick={() => run(async () => { const r = await call<unknown, { total: number; json: string }>('backupNow')({}); download(r.json); return r; }, (r) => `Backed up ${r.total} documents — a copy was downloaded`)}><Save size={15} aria-hidden />Back up now</button>
         <span className="small muted">Backups are manual on the free plan: each one is stored here and downloaded as a JSON file — keep those somewhere safe. Restore only re-creates documents missing from live data — it never overwrites.</span>
       </div>
       {L.isOwner && (
         <div className="card row wrap">
           <span className="small">Restore from a downloaded backup file:</span>
-          <label className="btn sm">🔍 Dry run<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) restoreFile(f, true); }} /></label>
-          <label className="btn sm primary">♻️ Restore missing<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f && confirm('Re-create documents missing from live data?')) restoreFile(f, false); }} /></label>
+          <label className="btn sm"><FileSearch size={14} aria-hidden />Dry run<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) restoreFile(f, true); }} /></label>
+          <label className="btn sm primary"><RotateCcw size={14} aria-hidden />Restore missing<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f && confirm('Re-create documents missing from live data?')) restoreFile(f, false); }} /></label>
         </div>
       )}
       {result && <pre className="json">{result}</pre>}
@@ -263,7 +264,7 @@ function Merge() {
           <Field label="Keep"><select className="select" value={pair.keepId} onChange={(e) => setPair({ ...pair, keepId: e.target.value })}><option value="">—</option>{list.map((x) => <option key={x.id} value={x.id}>{label(x.id)} · {x.id.slice(0, 6)}</option>)}</select></Field>
         </div>
         <Confirm className="btn primary" text="Merge? Every fixture, result, roster, award and allowlist reference is rewritten to the kept ID. A backup is taken first." onYes={() => run(() => call<unknown, { rewritten: number; moved: number }>('mergeEntities')({ kind, ...pair }), (r) => `Merged: ${r.rewritten} docs rewritten, ${r.moved} moved`)}>
-          {busy ? 'Merging…' : '🧬 Merge'}
+          {busy ? 'Merging…' : <><Dna size={15} aria-hidden />Merge</>}
         </Confirm>
       </div>
     </div>

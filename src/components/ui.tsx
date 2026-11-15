@@ -6,6 +6,7 @@ import { imageSrc } from '../lib/images';
 import { errMsg } from '../lib/format';
 import type { Team } from '../lib/types';
 import { ASIA, OCEANIA, findCountry } from '../lib/countries';
+import { Copy, Download, X, type LucideIcon } from 'lucide-react';
 
 // ---------- Section header: eyebrow + two-tone title with italic accent word ----------
 export function SectionHeader({ eyebrow, title, accent, link, linkLabel = 'View all →', right }: {
@@ -46,12 +47,12 @@ export function StatCard({ value, label }: { value: ReactNode; label: string }) 
   return <div className="stat-card"><div className="big num">{value}</div><div className="label">{label}</div></div>;
 }
 
-export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { key: T; label: string; emoji?: string }[]; active: T; onChange: (k: T) => void }) {
+export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { key: T; label: string; icon?: LucideIcon }[]; active: T; onChange: (k: T) => void }) {
   return (
     <div className="tabs" role="tablist">
       {tabs.map((t) => (
         <button key={t.key} role="tab" aria-selected={active === t.key} className={`tab ${active === t.key ? 'active' : ''}`} onClick={() => onChange(t.key)}>
-          {t.emoji && <span aria-hidden>{t.emoji} </span>}{t.label}
+          {t.icon && <t.icon size={15} aria-hidden />}{t.label}
         </button>
       ))}
     </div>
@@ -113,7 +114,7 @@ export function Modal({ onClose, children, wide }: { onClose: () => void; childr
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal onClick={(e) => e.stopPropagation()}>
-        <button className="icon-btn modal-close" onClick={onClose} aria-label="Close">✕</button>
+        <button className="icon-btn modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
         {children}
       </div>
     </div>
@@ -164,8 +165,8 @@ export function ExportCard({ title, filename, children }: { title: string; filen
     <div>
       {FEATURES.imageExport && (
         <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
-          <button className="btn sm" disabled={busy} onClick={() => run(() => copyPng(ref.current!), 'Copied image to clipboard')}>📋 Copy as PNG</button>
-          <button className="btn sm" disabled={busy} onClick={() => run(() => downloadPng(ref.current!, filename))}>⬇️ Download PNG</button>
+          <button className="btn sm" disabled={busy} onClick={() => run(() => copyPng(ref.current!), 'Copied image to clipboard')}><Copy size={14} aria-hidden />Copy as PNG</button>
+          <button className="btn sm" disabled={busy} onClick={() => run(() => downloadPng(ref.current!, filename))}><Download size={14} aria-hidden />Download PNG</button>
         </div>
       )}
       <div ref={ref} className="export-card">

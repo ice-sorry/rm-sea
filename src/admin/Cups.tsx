@@ -11,6 +11,7 @@ import { CupTeams } from '../pages/CupsPage';
 import { buildKnockout, cupTeamIds, shuffled } from '../lib/types';
 import type { Cup, MatchDoc } from '../lib/types';
 import { fmtDateTime } from '../lib/format';
+import { Dices, Pencil, Trophy } from 'lucide-react';
 
 /** Rebuild a cup's bracket from a seeding order: clears its unplayed fixtures, then creates the new first round (byes advance). */
 async function redraw(cup: Pick<Cup, 'id' | 'name'>, order: string[], matches: MatchDoc[]) {
@@ -59,7 +60,7 @@ export function AdminCups() {
         <Field label={`Teams (${f.teamIds.length})`}><TeamPicker value={f.teamIds} onChange={(teamIds) => setF({ ...f, teamIds })} /></Field>
         <p className="small muted" style={{ margin: 0 }}>Single elimination. Seeded in the order you tick teams, or draw at random. Byes go to the top seeds when the count isn't a power of two, and those teams go straight through.</p>
         <div className="row wrap">
-          <button className="btn primary" disabled={busy || f.name.trim().length < 2 || f.teamIds.length < 2} onClick={() => create(true)}>🎲 Create with random draw</button>
+          <button className="btn primary" disabled={busy || f.name.trim().length < 2 || f.teamIds.length < 2} onClick={() => create(true)}><Dices size={15} aria-hidden />Create with random draw</button>
           <button className="btn" disabled={busy || f.name.trim().length < 2 || f.teamIds.length < 2} onClick={() => create(false)}>Create in ticked order</button>
         </div>
       </div>
@@ -110,11 +111,11 @@ function CupAdminCard({ cup }: { cup: Cup }) {
   return (
     <div className="card stack">
       <div className="row wrap">
-        <h3 style={{ margin: 0 }}>🏆 {cup.name}</h3>
+        <h3 style={{ margin: 0 }}><Trophy size={18} aria-hidden />{cup.name}</h3>
         {cup.archived && <span className="badge">archived</span>}
         <span className="grow" />
-        <button className="btn sm" disabled={busy} onClick={() => setEdit(edit ? null : { name: cup.name, teamIds })}>✏️ Edit</button>
-        <Confirm className="btn sm" text={`Redraw ${cup.name} at random? Unplayed fixtures are replaced.`} onYes={randomize}>🎲 Randomize bracket</Confirm>
+        <button className="btn sm" disabled={busy} onClick={() => setEdit(edit ? null : { name: cup.name, teamIds })}><Pencil size={14} aria-hidden />Edit</button>
+        <Confirm className="btn sm" text={`Redraw ${cup.name} at random? Unplayed fixtures are replaced.`} onYes={randomize}><Dices size={14} aria-hidden />Randomize bracket</Confirm>
         <label className="check small"><input type="checkbox" checked={!!cup.archived} disabled={busy} onChange={(e) => run(() => updateDoc(doc(db, 'cups', cup.id), { archived: e.target.checked, status: e.target.checked ? 'archived' : 'live' }))} />Archived</label>
         <Confirm text={`Delete ${cup.name} and all its fixtures and results?`} onYes={remove}>Delete</Confirm>
       </div>

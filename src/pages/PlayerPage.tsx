@@ -10,6 +10,7 @@ import { useModal, playerHref, teamHref } from '../modals/ModalContext';
 import { pct, ms } from '../lib/format';
 import { POSITION_LABELS } from '../lib/types';
 import type { PlayerStatRow, RecordsDoc } from '../lib/types';
+import { Scale, ScrollText, Star } from 'lucide-react';
 
 export default function PlayerPage({ id }: { id: string }) {
   const L = useLeague();
@@ -59,14 +60,14 @@ export default function PlayerPage({ id }: { id: string }) {
         eyebrow={<>{POSITION_LABELS[p.position]}{team && <> · <a href={teamHref(team.id)}>{team.name}</a></>}{p.country && <> · {findCountry(p.country)?.name || p.country}</>}</>}
         title={first} accent={rest.join(' ') || undefined} titleAfter={<Flag country={p.country} size="lg" />}
         right={<span className="row">
-          <button className="btn" onClick={() => open({ kind: 'compare', ids: [id] })}>⚖️ Compare</button>
+          <button className="btn" onClick={() => open({ kind: 'compare', ids: [id] })}><Scale size={15} aria-hidden />Compare</button>
         </span>}>
         <Avatar src={p.avatarUrl} name={p.name} size="lg" />
       </PageHeader>
       <main className="page">
         {p.bio && <p style={{ margin: 0 }}>{p.bio}</p>}
         {isMe && <ProfileEditor />}
-        {held.length > 0 && <div className="row wrap">{held.map((r) => <span key={r.key} className="badge warn">📜 {r.label}: {r.value}</span>)}</div>}
+        {held.length > 0 && <div className="row wrap">{held.map((r) => <span key={r.key} className="badge warn"><ScrollText size={12} aria-hidden />{r.label}: {r.value}</span>)}</div>}
 
         <div className="grid-2">
           <section>
@@ -107,7 +108,7 @@ export default function PlayerPage({ id }: { id: string }) {
               return (
                 <div key={m.id} className="leader" style={{ gridTemplateColumns: '1fr auto' }} onClick={() => open({ kind: 'match', id: m.id })}>
                   <span className="ellipsis">{L.teams[m.homeTeamId]?.shortName} {m.seriesHome}–{m.seriesAway} {L.teams[m.awayTeamId]?.shortName}</span>
-                  <span className="small">{tot.g}G {tot.a}A{m.mvpPlayerId === id ? ' ⭐' : ''}</span>
+                  <span className="small">{tot.g}G {tot.a}A{m.mvpPlayerId === id ? <Star size={12} aria-label="MVP" style={{ marginLeft: 4 }} /> : ''}</span>
                 </div>
               );
             })}

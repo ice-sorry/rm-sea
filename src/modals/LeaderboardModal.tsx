@@ -5,6 +5,7 @@ import { Avatar, TeamChip, Empty, Tabs, Flag } from '../components/ui';
 import { useModal } from './ModalContext';
 import { LEADER_CATEGORIES } from '../lib/types';
 import type { PlayerStatRow, RecordsDoc } from '../lib/types';
+import { LeaderIcon } from '../components/icons';
 
 const value = (r: PlayerStatRow, k: string) => (k === 'contributions' ? r.goals + r.assists : k === 'rating' ? r.rating ?? 0 : Number((r as unknown as Record<string, number>)[k] || 0));
 const CAREER_KEYS: Record<string, 'goals' | 'assists' | 'mvps' | 'saves' | 'gp'> = { goals: 'goals', assists: 'assists', mvps: 'mvps', saves: 'saves' };
@@ -22,7 +23,7 @@ export default function LeaderboardModal({ category }: { category: string }) {
   const sorted = rows.filter((r) => r.v > 0).sort((a, b) => b.v - a.v);
   return (
     <div>
-      <div className="modal-head"><span style={{ fontSize: 36 }}>{cat?.emoji}</span><h2>{cat?.label}</h2></div>
+      <div className="modal-head"><LeaderIcon category={cat?.key} size={36} /><h2>{cat?.label}</h2></div>
       {careerKey && <Tabs tabs={[{ key: 'season', label: L.season?.name || 'Season' }, { key: 'all', label: 'All-time' }]} active={scope} onChange={setScope} />}
       {!sorted.length ? <Empty>No data yet.</Empty> : sorted.map((r, i) => {
         const p = L.players[r.playerId];

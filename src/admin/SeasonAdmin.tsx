@@ -10,6 +10,7 @@ import { buildFinalsBracket, DEFAULT_SEASON } from '../lib/types';
 import type { Award, Bracket, Season, SeasonStatus } from '../lib/types';
 import { toLocalInput } from '../lib/format';
 import { actor } from './util';
+import { Dices, Gift, House, Lightbulb, Lock, Medal, Pin, Rocket, Settings, Shield, X } from 'lucide-react';
 
 const STATUSES: SeasonStatus[] = ['draft', 'signups', 'live', 'finals', 'complete'];
 const json = (v: unknown) => JSON.stringify(v, null, 2);
@@ -28,7 +29,7 @@ export function AdminSeason() {
         </select>
         {L.seasonId && L.seasonId !== L.general.currentSeasonId && <SetCurrent id={L.seasonId} />}
       </div>
-      <Tabs tabs={[{ key: 'settings', label: 'Settings', emoji: '⚙️' }, { key: 'teams', label: 'Teams & divisions', emoji: '🛡️' }, { key: 'home', label: 'Home & Wrapped', emoji: '🏠' }, { key: 'launch', label: 'Season launch', emoji: '🚀' }]} active={tab} onChange={setTab} />
+      <Tabs tabs={[{ key: 'settings', label: 'Settings', icon: Settings }, { key: 'teams', label: 'Teams & divisions', icon: Shield }, { key: 'home', label: 'Home & Wrapped', icon: House }, { key: 'launch', label: 'Season launch', icon: Rocket }]} active={tab} onChange={setTab} />
       {tab === 'settings' && (L.season ? <SeasonSettings key={L.season.id} season={L.season} /> : <Empty>Launch a season first.</Empty>)}
       {tab === 'teams' && (L.season ? <Entries /> : <Empty>Launch a season first.</Empty>)}
       {tab === 'home' && <HomeAndWrapped />}
@@ -74,7 +75,7 @@ function SeasonSettings({ season }: { season: Season }) {
         <Field label="Season start"><input className="input" type="datetime-local" value={f.kickoff} onChange={(e) => setF({ ...f, kickoff: e.target.value })} /><span className="small muted">Home shows a countdown while the season is draft or signups.</span></Field>
       </div>
       <div className="row wrap">
-        <label className="check"><input type="checkbox" checked={f.locked} onChange={(e) => setF({ ...f, locked: e.target.checked })} />🔒 Locked (blocks result edits)</label>
+        <label className="check"><input type="checkbox" checked={f.locked} onChange={(e) => setF({ ...f, locked: e.target.checked })} /><Lock size={14} aria-hidden />Locked (blocks result edits)</label>
         <label className="check"><input type="checkbox" checked={f.divided} onChange={(e) => setF({ ...f, divided: e.target.checked })} />Divisions on</label>
       </div>
       <div className="grid-2">
@@ -129,18 +130,18 @@ function HomeAndWrapped() {
   return (
     <div className="grid-2">
       <div className="card stack">
-        <h3>🏠 Home page mode</h3>
+        <h3><House size={18} aria-hidden />Home page mode</h3>
         <p className="small muted">Pin a finished season's celebration to Home while the next season is built.</p>
         <div className="row wrap">
           <button className={`btn ${L.general.homeMode !== 'pinned' ? 'primary' : ''}`} disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/general'), { homeMode: 'live' }, { merge: true }), 'Home is live')}>Live</button>
           {L.seasons.map((s) => (
             <button key={s.id} className={`btn sm ${L.general.homeMode === 'pinned' && L.general.pinnedSeasonId === s.id ? 'primary' : ''}`} disabled={busy}
-              onClick={() => run(() => setDoc(doc(db, 'settings/general'), { homeMode: 'pinned', pinnedSeasonId: s.id }, { merge: true }), `Pinned ${s.name}`)}>📌 {s.name}</button>
+              onClick={() => run(() => setDoc(doc(db, 'settings/general'), { homeMode: 'pinned', pinnedSeasonId: s.id }, { merge: true }), `Pinned ${s.name}`)}><Pin size={14} aria-hidden />{s.name}</button>
           ))}
         </div>
       </div>
       <div className="card stack">
-        <h3>🎁 Wrapped</h3>
+        <h3><Gift size={18} aria-hidden />Wrapped</h3>
         <p className="small muted">Per-player recap slides. Built automatically when a season is marked complete.</p>
         <Field label="Open until"><input className="input" type="datetime-local" value={until} onChange={(e) => setUntil(e.target.value)} /></Field>
         <div className="row">
@@ -212,7 +213,7 @@ function LaunchWizard() {
             const r = await call<unknown, { seasonId: string }>('moveToNextSeason')({ ...f, startsAt: undefined, kickoffDate: f.startsAt ? new Date(f.startsAt).getTime() : null, fromSeasonId: f.fromSeasonId || undefined });
             L.setSeasonId(r.seasonId); setStep(1);
             return r;
-          }, (r) => `Launched ${r.seasonId}`)}>🚀 Launch season</button>}
+          }, (r) => `Launched ${r.seasonId}`)}><Rocket size={15} aria-hidden />Launch season</button>}
       </div>
     </div>
   );
@@ -252,7 +253,7 @@ export function AdminPlayoffs() {
       <div className="card stack">
         <p className="small muted">Seeds come from the current table using the season's finals format (byes, direct QF seeds, wildcard seeds). Winners advance automatically; deleting a result rolls the bracket back.</p>
         <div className="row wrap">
-          <Confirm className="btn primary" text="Draw the finals bracket from the current standings?" onYes={generate}>🎲 Draw from table</Confirm>
+          <Confirm className="btn primary" text="Draw the finals bracket from the current standings?" onYes={generate}><Dices size={15} aria-hidden />Draw from table</Confirm>
           {brackets.length > 0 && <Confirm text="Delete the bracket and all unplayed + played playoff fixtures?" onYes={reset}>Reset bracket</Confirm>}
         </div>
       </div>
@@ -336,16 +337,16 @@ export function AdminAwards() {
           </Field>
           <Field label="Value / note"><input className="input" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} /></Field>
         </div>
-        {sug && <div className="row small">💡 Suggested: <b>{f.recipientType === 'player' ? L.players[sug.id]?.name : L.teams[sug.id]?.name}</b> ({sug.value})
+        {sug && <div className="row small"><Lightbulb size={14} aria-hidden />Suggested: <b>{f.recipientType === 'player' ? L.players[sug.id]?.name : L.teams[sug.id]?.name}</b> ({sug.value})
           <button className="btn sm" onClick={() => setF({ ...f, recipientId: sug.id, value: sug.value })}>Use suggestion</button></div>}
-        <button className="btn primary" disabled={busy || !f.recipientId} onClick={grant}>🏅 Grant award</button>
+        <button className="btn primary" disabled={busy || !f.recipientId} onClick={grant}><Medal size={15} aria-hidden />Grant award</button>
       </div>
       <div className="card flush table-wrap">
         <table className="data">
           <thead><tr><th>Award</th><th>Recipient</th><th>Value</th><th /></tr></thead>
           <tbody>{awards.map((a) => (
             <tr key={a.id}><td>{a.label}</td><td>{a.recipientType === 'player' ? L.players[a.recipientId]?.name : L.teams[a.recipientId]?.name}</td><td>{a.value ?? ''}</td>
-              <td className="right"><Confirm text="Remove this award?" onYes={() => run(() => deleteDoc(doc(db, `seasons/${L.seasonId}/awards/${a.id}`)), 'Removed')}>✕</Confirm></td></tr>
+              <td className="right"><Confirm text="Remove this award?" onYes={() => run(() => deleteDoc(doc(db, `seasons/${L.seasonId}/awards/${a.id}`)), 'Removed')}><X size={14} aria-label="Remove award" /></Confirm></td></tr>
           ))}</tbody>
         </table>
         {!awards.length && <Empty>No awards granted this season.</Empty>}

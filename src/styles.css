@@ -93,7 +93,7 @@ img { max-width: 100%; }
 .brand img { width: 32px; height: 32px; border-radius: 8px; }
 .brand:hover { text-decoration: none; }
 .nav { display: none; gap: 2px; }
-.nav a { color: var(--text-muted); padding: 6px 10px; border-radius: var(--radius-sm); font-weight: 500; font-size: 14px; white-space: nowrap; transition: background var(--motion), color var(--motion); }
+.nav a { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); padding: 6px 10px; border-radius: var(--radius-sm); font-weight: 500; font-size: 14px; white-space: nowrap; transition: background var(--motion), color var(--motion); }
 .nav a:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 .nav a.active { color: var(--text); box-shadow: inset 0 -2px 0 var(--accent-2); border-radius: 0; }
 @media (min-width: 900px) { .nav { display: flex; } }
@@ -126,7 +126,7 @@ img { max-width: 100%; }
 .bottomnav a:hover { text-decoration: none; }
 @media (min-width: 900px) { .bottomnav { display: none; } }
 .overflow-menu { position: fixed; bottom: calc(var(--bottomnav-h) + 8px); right: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s2); z-index: 60; display: flex; flex-direction: column; min-width: 200px; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
-.overflow-menu a { padding: 10px 12px; color: var(--text); border-radius: var(--radius-sm); }
+.overflow-menu a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text); border-radius: var(--radius-sm); }
 .overflow-menu a:hover { background: var(--surface-2); text-decoration: none; }
 
 /* ---------- Section header: eyebrow + two-tone title ---------- */
@@ -140,7 +140,7 @@ img { max-width: 100%; }
 /* ---------- Cards ---------- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4); }
 .card.flush { padding: 0; overflow: hidden; }
-.card h3 { margin: 0 0 var(--s3); font-family: var(--font-display); text-transform: uppercase; font-size: 20px; letter-spacing: .3px; }
+.card h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 var(--s3); font-family: var(--font-display); text-transform: uppercase; font-size: 20px; letter-spacing: .3px; }
 .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4); }
 .stat-card .big { font-family: var(--font-display); font-weight: 800; font-size: 44px; line-height: 1; }
 .stat-card .label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 4px; }
@@ -168,7 +168,7 @@ img { max-width: 100%; }
 /* ---------- Tabs ---------- */
 .tabs { display: flex; gap: var(--s1); overflow-x: auto; border-bottom: 1px solid var(--border); margin-bottom: var(--s4); scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
-.tab { padding: 10px 12px; background: none; border: 0; color: var(--text-muted); font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: color var(--motion), border-color var(--motion); }
+.tab { display: inline-flex; align-items: center; gap: 6px; padding: 10px 12px; background: none; border: 0; color: var(--text-muted); font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: color var(--motion), border-color var(--motion); }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--text); border-bottom-color: var(--accent-2); }
 
@@ -372,3 +372,8 @@ table.data thead tr.group-row th.group { color: var(--accent-2); box-shadow: ins
 .page-header .btn.ghost { border-color: transparent; }
 .page-header .input { background: rgba(0,0,0,.25); border-color: rgba(255,255,255,.35); color: #fff; }
 .page-header .input::placeholder { color: rgba(255,255,255,.6); }
+
+/* ---------- Lucide icons ---------- */
+svg.lucide { flex: none; vertical-align: -0.15em; }
+.hero-pin .trophy { color: var(--zone-champion); line-height: 1; }
+.admin-nav-mobile .btn { gap: 6px; }

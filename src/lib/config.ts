@@ -1,4 +1,5 @@
 // Brand + integration constants (spec §1, §5). Override via .env.local.
+import { CalendarDays, ChartLine, House, ListOrdered, Medal, Shield, Trophy, User, type LucideIcon } from 'lucide-react';
 const env = import.meta.env;
 
 export const BRAND = {
@@ -15,16 +16,16 @@ export const SOCIALS = {
 };
 export const DISCORD_CLIENT_ID = env.VITE_DISCORD_CLIENT_ID || '1569644221718331412';
 
-export interface NavItem { route: string; label: string; emoji: string; audience?: 'signedIn' | 'admin' }
+export interface NavItem { route: string; label: string; icon: LucideIcon; audience?: 'signedIn' | 'admin' }
 export const NAV: NavItem[] = [
-  { route: 'home', label: 'Home', emoji: '🏠' },
-  { route: 'table', label: 'Table', emoji: '📊' },
-  { route: 'teams', label: 'Teams', emoji: '🛡️' },
-  { route: 'players', label: 'Players', emoji: '👤' },
-  { route: 'fixtures', label: 'Fixtures', emoji: '🗓️' },
-  { route: 'stats', label: 'Statistics', emoji: '📈' },
-  { route: 'cups', label: 'Cups', emoji: '🏆' },
-  { route: 'awards', label: 'Awards', emoji: '🏅' },
+  { route: 'home', label: 'Home', icon: House },
+  { route: 'table', label: 'Table', icon: ListOrdered },
+  { route: 'teams', label: 'Teams', icon: Shield },
+  { route: 'players', label: 'Players', icon: User },
+  { route: 'fixtures', label: 'Fixtures', icon: CalendarDays },
+  { route: 'stats', label: 'Statistics', icon: ChartLine },
+  { route: 'cups', label: 'Cups', icon: Trophy },
+  { route: 'awards', label: 'Awards', icon: Medal },
 ];
 
 /** Feature switches. Flip to true to bring a feature back. */
