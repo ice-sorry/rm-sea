@@ -69,6 +69,9 @@ img { max-width: 100%; }
 .page-header .view-all, .page-header a { color: #fff; }
 @media (min-width: 900px) { .page-header-inner { min-height: 220px; padding: 56px var(--s6); } }
 .page-header .title .flag { margin-left: 12px; vertical-align: middle; }
+/* Team page: push the name/abbreviation block away from the crest. */
+.page-header-inner > .crest + .grow { margin-left: var(--s3); }
+@media (min-width: 900px) { .page-header-inner > .crest + .grow { margin-left: var(--s5); } }
 .page-header-sub { margin-top: var(--s2); font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: 3px; color: rgba(255,255,255,.75); }
 .page.home-page { padding-bottom: 96px; }
 
@@ -115,7 +118,9 @@ img { max-width: 100%; }
 .team-row .team-meta span { display: inline-flex; align-items: center; gap: 6px; }
 .team-row .team-awards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .team-row .team-awards .badge { font-size: 15px; padding: 4px 10px; }
-@media (min-width: 900px) { .team-row .team-name { font-size: 52px; } }
+.team-row .crest.lg { width: 70px; height: 70px; font-size: 24px; border-radius: 14px; }
+.team-row { padding-left: 28px; }
+@media (min-width: 900px) { .team-row .team-name { font-size: 52px; } .team-row .crest.lg { width: 96px; height: 96px; font-size: 32px; border-radius: 18px; } .team-row { padding-left: 36px; } }
 .season-select { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 6px; font-size: 13px; }
 
 /* ---------- Bottom nav (mobile) ---------- */
