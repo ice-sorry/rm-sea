@@ -5,14 +5,14 @@ main = "src/index.ts"
 compatibility_date = "2026-09-01"
 
 [vars]
-FIREBASE_PROJECT_ID = "srl-dev"
+FIREBASE_PROJECT_ID = "rm-sea"
 DISCORD_CLIENT_ID = "1569644221718331412"
 DISCORD_GUILD_ID = "1562776724431831050"
 DISCORD_ADMIN_ROLE_IDS = "1562781903604424794,1563169917384134827"
 # Extra OAuth redirect URIs beyond https://<project>.web.app and .firebaseapp.com (e.g. a custom domain)
 ALLOWED_REDIRECTS = "http://localhost:5000/auth/callback,https://rm-sea.web.app/auth/callback,https://rm-sea.firebaseapp.com/auth/callback"
-# Lock CORS to your site once deployed, e.g. "https://srl-dev.web.app,https://srl-dev.firebaseapp.com"
-ALLOWED_ORIGINS = "https://srl-dev.web.app,https://srl-dev.firebaseapp.com"
+# Lock CORS to your site once deployed, e.g. "https://rm-sea.web.app,https://rm-sea.firebaseapp.com"
+ALLOWED_ORIGINS = "https://rm-sea.web.app,https://rm-sea.firebaseapp.com"
 
 # Secrets (set with `npx wrangler secret put <NAME> --config worker/wrangler.toml`):
 #   FIREBASE_SERVICE_ACCOUNT  – the whole service-account JSON key

@@ -41,7 +41,7 @@ Firestore triggers don't exist without Functions either, so the browser now call
 
 - Node.js **22+** and npm
 - Java **21+** JDK for the Firestore emulator (firebase-tools 15 refuses older Java), e.g. `winget install EclipseAdoptium.Temurin.21.JDK`
-- One Firebase project on the **Spark (free)** plan. The ID is `srl-dev` throughout; if yours differs, change it in `.firebaserc`, `worker/wrangler.toml` (`FIREBASE_PROJECT_ID`) and `.env.production`.
+- One Firebase project on the **Spark (free)** plan. The ID is `rm-sea` throughout; if yours differs, change it in `.firebaserc`, `worker/wrangler.toml` (`FIREBASE_PROJECT_ID`) and `.env.production`.
 - A free Cloudflare account (for the Worker)
 
 ## 2. Run locally with the Emulator Suite
@@ -109,7 +109,7 @@ Admin role IDs `1562781903604424794, 1563169917384134827` grant admin automatica
 **Site**
 8. `npm run deploy` (builds the SPA, deploys Hosting, Firestore rules and indexes).
 9. **Bootstrap the first owner**: sign in once with Discord, then in the Firestore console create `settings/admins` = `{ ownerUids: ["discord:<your id>"], adminUids: [], adminRoleIds: [...] }`. Sign out and back in. From then on manage admins in *Admin → Settings → Admins*.
-10. Optional seed of a real project: `SEED_PROD=1 GOOGLE_APPLICATION_CREDENTIALS=key.json GCLOUD_PROJECT=srl-dev npm run seed` (does **not** wipe; only use on an empty project).
+10. Optional seed of a real project: `SEED_PROD=1 GOOGLE_APPLICATION_CREDENTIALS=key.json GCLOUD_PROJECT=rm-sea npm run seed` (does **not** wipe; only use on an empty project).
 
 ## 5. How it works
 

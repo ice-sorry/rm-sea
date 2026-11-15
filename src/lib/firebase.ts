@@ -5,7 +5,7 @@ import { BROWSER_OP_NAMES } from '../../core/opnames';
 
 const env = import.meta.env;
 export const USE_EMULATORS = env.VITE_USE_EMULATORS === 'true';
-const projectId = env.VITE_FIREBASE_PROJECT_ID || 'srl-dev';
+const projectId = env.VITE_FIREBASE_PROJECT_ID || 'rm-sea';
 const host = typeof location !== 'undefined' ? location.hostname : 'localhost';
 
 export const app = initializeApp({
