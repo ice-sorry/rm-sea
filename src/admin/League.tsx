@@ -7,6 +7,7 @@ import { SectionHeader, Empty, Crest, Field, useAction, Confirm, Avatar, TeamChi
 import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Position, Team, Player } from '../lib/types';
 import { actor, normalizeTeamName, notifyRosterMove, syncTeamRoles } from './util';
+import { normalizeImageLink } from '../lib/images';
 
 // ======================= Teams =======================
 const blankTeam = { name: '', shortName: '', color: '#1D8ADE', crestUrl: '', discordRoleId: '', captainIds: [] as string[], active: true };
@@ -19,7 +20,7 @@ export function AdminTeams() {
     const e = edit!;
     const data = {
       name: e.name.trim(), shortName: (e.shortName || e.name.slice(0, 4)).trim().toUpperCase(), nameNormalized: normalizeTeamName(e.name),
-      color: e.color, crestUrl: e.crestUrl, discordRoleId: e.discordRoleId || null, captainIds: e.captainIds, active: e.active,
+      color: e.color, crestUrl: e.crestUrl ? normalizeImageLink(e.crestUrl) : '', discordRoleId: e.discordRoleId || null, captainIds: e.captainIds, active: e.active,
     };
     if (e.id) await updateDoc(doc(db, 'teams', e.id), data);
     else await addDoc(collection(db, 'teams'), { ...data, mergedInto: null });

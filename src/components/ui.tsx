@@ -2,6 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, u
 import { initials } from '../lib/format';
 import { copyPng, downloadPng } from '../lib/exportImage';
 import { BRAND, FEATURES } from '../lib/config';
+import { imageSrc } from '../lib/images';
 import { errMsg } from '../lib/format';
 import type { Team } from '../lib/types';
 import { ASIA, OCEANIA, findCountry } from '../lib/countries';
@@ -59,7 +60,8 @@ export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { key
 
 export function Crest({ team, size = '' }: { team?: Team | null; size?: '' | 'sm' | 'lg' }) {
   if (!team) return <span className={`crest ${size}`} style={{ background: 'var(--surface-2)' }}>?</span>;
-  if (team.crestUrl) return <img className={`crest ${size}`} src={team.crestUrl} alt="" style={{ background: team.color }} loading="lazy" />;
+  // Discord attachment links expire after ~24 h; imageSrc() routes them through the Worker, which re-signs them.
+  if (team.crestUrl) return <img className={`crest ${size}`} src={imageSrc(team.crestUrl)} alt="" style={{ background: team.color }} loading="lazy" />;
   return <span className={`crest ${size}`} style={{ background: team.color || 'var(--accent)' }}>{(team.shortName || initials(team.name)).slice(0, 3)}</span>;
 }
 
