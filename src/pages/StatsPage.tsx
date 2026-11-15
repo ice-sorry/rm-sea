@@ -6,9 +6,9 @@ import { useDoc, go } from '../lib/hooks';
 import { PageHeader, Tabs, Empty, Crest, TeamChip, Avatar, Skeleton, Flag } from '../components/ui';
 import { LeaderList, LineChart, ResultCard } from '../components/league';
 import { useModal } from '../modals/ModalContext';
-import { pct } from '../lib/format';
+import { pct, signed } from '../lib/format';
 import { LEADER_CATEGORIES, STAT_KEYS, STAT_LABELS, gamePoints } from '../lib/types';
-import type { MatchDoc, PlayerStatRow, RecordsDoc } from '../lib/types';
+import type { MatchDoc, PlayerStatRow, RecordsDoc, TeamStatRow } from '../lib/types';
 
 type Tab = 'overview' | 'players' | 'teams' | 'h2h';
 const TABS: { key: Tab; label: string; emoji: string }[] = [
@@ -168,7 +168,7 @@ function Overview() {
           { key: 'mvpRate', label: 'MVP / series', get: (r) => r.adv.mvpRate, num: true },
         ]} />
       </div>
-      <div className="card flush"><div style={{ padding: 16, paddingBottom: 0 }}><h3>🛡️ Team stats</h3></div><TeamsTable /></div>
+      <div className="card flush"><div style={{ padding: 16, paddingBottom: 0 }}><h3>🛡️ Team stats</h3></div><TeamsTable compact /></div>
       <div className="row"><a className="btn" href="#stats/players">Full player stats →</a><a className="btn" href="#stats/teams">Full team stats →</a></div>
     </div>
   );
@@ -201,13 +201,27 @@ function PlayersTab() {
   );
 }
 
-function TeamsTable() {
+/** Team stats table. `compact` (Statistics → Overview) shows only the headline columns. */
+function TeamsTable({ compact }: { compact?: boolean }) {
   const L = useLeague();
   const { open } = useModal();
   if (!L.teamStats) return <Skeleton />;
+  const team: Col<TeamStatRow> = { key: 'team', label: 'Team', get: (r) => L.teams[r.teamId]?.name || '', render: (r) => <span className="team-cell"><Crest team={L.teams[r.teamId]} size="sm" />{L.teams[r.teamId]?.name}</span> };
+  if (compact) {
+    return (
+      <SortTable rows={L.teamStats.rows} initial="gd" rowKey={(r) => r.teamId} onRow={(r) => open({ kind: 'team', id: r.teamId })} cols={[
+        team,
+        { key: 'games', label: 'Games played', get: (r) => r.games, num: true },
+        { key: 'goalsPg', label: 'Goals / game', get: (r) => r.goalsPg, render: (r) => r.goalsPg.toFixed(2), num: true },
+        { key: 'concededPg', label: 'Goals against / game', get: (r) => r.concededPg, render: (r) => r.concededPg.toFixed(2), num: true },
+        { key: 'gd', label: 'Goal difference', get: (r) => r.gf - r.ga, render: (r) => signed(r.gf - r.ga), num: true },
+        { key: 'cleanSheets', label: 'Clean sheets', get: (r) => r.cleanSheets, num: true },
+      ]} />
+    );
+  }
   return (
     <SortTable rows={L.teamStats.rows} initial="gf" rowKey={(r) => r.teamId} onRow={(r) => open({ kind: 'team', id: r.teamId })} cols={[
-      { key: 'team', label: 'Team', get: (r) => L.teams[r.teamId]?.name || '', render: (r) => <span className="team-cell"><Crest team={L.teams[r.teamId]} size="sm" />{L.teams[r.teamId]?.name}</span> },
+      team,
       { key: 'series', label: 'Series', get: (r) => r.series, num: true },
       { key: 'games', label: 'Games', get: (r) => r.games, num: true },
       { key: 'gw', label: 'GW', get: (r) => r.gw, num: true },
