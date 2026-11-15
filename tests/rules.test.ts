@@ -136,6 +136,13 @@ describe('self-service', () => {
     await assertFails(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'new_team', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'pending', toTeamId: null, teamName: 'X' }));
     await assertSucceeds(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'join_season', teamId: 't1', seasonId: 's1', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'pending', toTeamId: null }));
   });
+  it('captains change only their own team colour', async () => {
+    await assertSucceeds(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { color: '#ff8800' }));
+    await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { color: 'red' }));
+    await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { color: '#ff8800', name: 'Renamed' }));
+    await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t2'), { color: '#ff8800' }));
+    await assertFails(updateDoc(doc(as(USER), 'teams/t1'), { color: '#ff8800' }));
+  });
   it('only a team captain can ask for the team to join or leave a season', async () => {
     const req = (type: string, teamId: string, by = CAPTAIN, playerId = 'p-cap') =>
       addDoc(collection(as(by), 'requests'), { type, teamId, seasonId: 's1', playerId, requestedBy: by, status: 'pending', toTeamId: null });

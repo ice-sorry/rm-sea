@@ -136,6 +136,7 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
     <section>
       <SectionHeader eyebrow="Captain tools" title={team?.name || 'Team'} accent="HQ" />
       <SeasonEntryCard teamId={teamId} />
+      <TeamColorCard teamId={teamId} />
       <div className="grid-2">
         <div className="card">
           <h3>🔔 Join & transfer requests</h3>
@@ -162,6 +163,29 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// ---------- Team page: team colour (captains and admins) ----------
+function TeamColorCard({ teamId }: { teamId: string }) {
+  const L = useLeague();
+  const team = L.teams[teamId];
+  const { run, busy } = useAction();
+  const [color, setColor] = useState<string | null>(null);
+  if (!team) return null;
+  const current = /^#[0-9a-f]{6}$/i.test(team.color || '') ? team.color : '#1D8ADE';
+  const value = color ?? current;
+  return (
+    <div className="card row wrap" style={{ marginBottom: 'var(--s4)' }}>
+      <h3 style={{ margin: 0 }}>🎨 Team colour</h3>
+      <input type="color" value={value} onChange={(e) => setColor(e.target.value)} style={{ width: 64, height: 36 }} aria-label="Team colour" />
+      <Crest team={{ ...team, color: value }} />
+      <span className="grow small muted">Used for the crest, team chips, the teams list and Discord posts.</span>
+      <button className="btn sm primary" disabled={busy || value.toLowerCase() === current.toLowerCase()} onClick={() => run(async () => {
+        await updateDoc(doc(db, 'teams', teamId), { color: value });
+        setColor(null);
+      }, 'Team colour saved')}>Save colour</button>
+    </div>
   );
 }
 
