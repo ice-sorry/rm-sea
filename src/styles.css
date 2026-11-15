@@ -60,7 +60,7 @@ img { max-width: 100%; }
 }
 
 /* ---------- Page header band (brand colour, full width) ---------- */
-.page-header { background: linear-gradient(110deg, var(--accent) 0%, #0650c0 100%); border-bottom: 3px solid var(--accent-2); }
+.page-header { background: linear-gradient(110deg, var(--accent) 0%, #022559 100%); }
 .page-header-inner { max-width: var(--maxw); margin: 0 auto; min-height: 150px; padding: var(--s8) var(--s3); display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; }
 .page-header .eyebrow { color: rgba(255,255,255,.75); }
 .page-header .title { color: #fff; overflow-wrap: anywhere; }
