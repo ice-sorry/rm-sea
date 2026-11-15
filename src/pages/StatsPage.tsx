@@ -39,8 +39,8 @@ export default function StatsPage({ sub }: { sub: string }) {
 
 // ---------- Sortable table ----------
 export interface Col<T> { key: string; label: string; get: (r: T) => number | string | null; render?: (r: T) => ReactNode; num?: boolean; group?: string }
-export function SortTable<T>({ rows, cols, initial, onRow, rowKey }: { rows: T[]; cols: Col<T>[]; initial: string; onRow?: (r: T) => void; rowKey: (r: T) => string }) {
-  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: initial, dir: -1 });
+export function SortTable<T>({ rows, cols, initial, initialDir = -1, onRow, rowKey }: { rows: T[]; cols: Col<T>[]; initial: string; initialDir?: 1 | -1; onRow?: (r: T) => void; rowKey: (r: T) => string }) {
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: initial, dir: initialDir });
   const col = cols.find((c) => c.key === sort.key) || cols[0];
   const sorted = [...rows].sort((a, b) => {
     const x = col.get(a), y = col.get(b);
