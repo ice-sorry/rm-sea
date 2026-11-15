@@ -7,6 +7,7 @@ import { PageHeader, Crest, Empty, Skeleton, Field, useAction } from '../compone
 import { SignInButton } from '../components/Shell';
 import { teamHref } from '../modals/ModalContext';
 import type { Award } from '../lib/types';
+import { Crown, Users } from 'lucide-react';
 
 const AWARD_EMOJI: Record<string, string> = { champion: '🏆', golden_boot: '👟', playmaker: '🎯', golden_glove: '🧤', mvp: '⭐', custom: '🏅' };
 
@@ -32,16 +33,23 @@ export default function TeamsPage() {
           <div className="teams-list">
             {teams.map((t) => {
               const mine = (awards || []).filter((a) => a.recipientId === t.id);
+              // Season roster when the club is in the selected season, otherwise the players currently on it.
+              const count = L.rosters[t.id]?.length ?? L.playerList.filter((p) => p.currentTeamId === t.id).length;
+              const captains = (t.captainIds || []).map((id) => L.players[id]?.name).filter(Boolean);
               return (
                 <a key={t.id} className="team-row" href={teamHref(t.id)} style={{ '--team': t.color || 'var(--accent)' } as CSSProperties}>
                   <Crest team={t} size="lg" />
                   <div className="grow" style={{ minWidth: 0 }}>
                     <div className="team-name">{t.name}</div>
-                    <div className="team-awards">
-                      {awards === null ? <span className="muted small">Loading awards…</span>
-                        : !mine.length ? <span className="muted">No awards yet</span>
-                        : mine.map((a) => <span key={a.seasonName + a.id} className="badge warn">{AWARD_EMOJI[a.type] || '🏅'} {a.label} · {a.seasonName}</span>)}
+                    <div className="team-meta">
+                      <span><Crown size={16} />{captains.length ? captains.join(', ') : 'No captain'}</span>
+                      <span><Users size={16} />{count} {count === 1 ? 'player' : 'players'}</span>
                     </div>
+                    {mine.length > 0 && (
+                      <div className="team-awards">
+                        {mine.map((a) => <span key={a.seasonName + a.id} className="badge warn">{AWARD_EMOJI[a.type] || '🏅'} {a.label} · {a.seasonName}</span>)}
+                      </div>
+                    )}
                   </div>
                 </a>
               );

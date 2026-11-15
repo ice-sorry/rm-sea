@@ -107,10 +107,12 @@ img { max-width: 100%; }
 .flag.lg { width: 36px; height: 26px; border-radius: 3px; }
 
 /* ---------- Teams page ---------- */
-.teams-list { display: flex; flex-direction: column; gap: 40px; }
+.teams-list { display: flex; flex-direction: column; gap: 40px; margin-top: var(--s6); }
 .team-row { --team: var(--accent); display: flex; align-items: center; gap: var(--s4); padding: var(--s5) var(--s4); border-radius: var(--radius); background: var(--surface); background: linear-gradient(100deg, color-mix(in srgb, var(--team) 24%, var(--surface)) 0%, color-mix(in srgb, var(--team) 8%, var(--surface)) 45%, var(--surface) 80%); border: 1px solid var(--border); box-shadow: inset 6px 0 0 var(--team); cursor: pointer; transition: border-color var(--motion); }
 .team-row:hover { border-color: var(--team); text-decoration: none; }
 .team-row .team-name { font-family: var(--font-display); font-weight: 800; font-size: 36px; line-height: 1.05; text-transform: uppercase; color: var(--text); overflow-wrap: anywhere; }
+.team-row .team-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; color: var(--text-muted); font-size: 15px; }
+.team-row .team-meta span { display: inline-flex; align-items: center; gap: 6px; }
 .team-row .team-awards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .team-row .team-awards .badge { font-size: 15px; padding: 4px 10px; }
 @media (min-width: 900px) { .team-row .team-name { font-size: 52px; } }
