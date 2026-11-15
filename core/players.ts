@@ -172,6 +172,55 @@ export const notifyRosterMove = onCall(async (req) => {
   return { posted: moves.length };
 });
 
+/** True when the player is on this team: on its season roster, or (between seasons / club not entered) by currentTeamId. */
+async function isOnTeam(seasonId: string | null, playerId: string, teamId: string) {
+  const [p, roster] = await db.getAll(db.doc(`players/${playerId}`), db.doc(`seasons/${seasonId || '-'}/rosters/${teamId}`));
+  return p.data()?.currentTeamId === teamId || (!!seasonId && (roster.data()?.playerIds || []).includes(playerId));
+}
+
+/** Make a player a free agent, then sync roles and announce it. Callers check permissions and team membership. */
+async function releasePlayer(seasonId: string | null, playerId: string, teamId: string, uid: string) {
+  if (seasonId) await movePlayer(seasonId, playerId, null, uid, 'request');
+  else await db.doc(`players/${playerId}`).update({ currentTeamId: null, updatedAt: FieldValue.serverTimestamp() });
+  await syncRolesFor([teamId]);
+  await announceMoves([{ playerId, fromTeamId: teamId, toTeamId: null }]);
+}
+
+/**
+ * Remove a player from a team. Admins remove straight away; a captain's removal becomes a request an admin approves.
+ * Captains can't ask while the transfer window is closed.
+ */
+export const kickPlayer = onCall(async (req) => {
+  const uid = requireAuth(req);
+  const { teamId, playerId } = (req.data || {}) as { teamId?: string; playerId?: string };
+  if (!teamId || !playerId) throw new HttpsError('invalid-argument', 'teamId and playerId are required.');
+  const [me, team] = await db.getAll(db.doc(`users/${uid}`), db.doc(`teams/${teamId}`));
+  if (!team.exists) throw new HttpsError('not-found', 'Team not found.');
+  const captainIds: string[] = team.data()!.captainIds || [];
+  const admin = isAdminReq(req);
+  if (!admin && !(me.data()?.playerId && captainIds.includes(me.data()!.playerId))) throw new HttpsError('permission-denied', "Only this team's captain can remove players.");
+  if (captainIds.includes(playerId)) throw new HttpsError('failed-precondition', "Captains can't be removed. An admin can change the captains first.");
+  if (!admin && (await transfersBlocked())) throw new HttpsError('failed-precondition', 'Transfers are closed right now.');
+  const seasonId = await currentSeasonId();
+  if (!(await isOnTeam(seasonId, playerId, teamId))) throw new HttpsError('failed-precondition', 'That player is not on this team.');
+  const pending = (await db.collection('requests').where('playerId', '==', playerId).where('status', '==', 'pending').get()).docs;
+  if (!admin) {
+    // Captains ask; an admin approves in Admin → Moves → Requests.
+    if (pending.some((d) => d.data()!.type === 'kick_player' && d.data()!.teamId === teamId)) throw new HttpsError('already-exists', 'A removal request for this player is already waiting for an admin.');
+    await db.collection('requests').add({
+      type: 'kick_player', teamId, playerId, fromTeamId: teamId, toTeamId: null, seasonId: seasonId || null,
+      status: 'pending', message: String(req.data?.message || '').slice(0, 200), requestedBy: uid, createdAt: FieldValue.serverTimestamp(),
+    });
+    return { requested: true };
+  }
+  await releasePlayer(seasonId, playerId, teamId, uid);
+  // Pending leave or removal requests for this player and team are moot now.
+  await Promise.all(pending.filter((d) => ['leave_team', 'kick_player'].includes(d.data()!.type) && d.data()!.teamId === teamId)
+    .map((d) => d.ref.update({ status: 'cancelled', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() })));
+  await auditNote(uid, `Removed ${playerId} from ${teamId}`, `players/${playerId}`);
+  return { ok: true };
+});
+
 /** Admin mid-season transfer. Runs in the admin's browser. */
 export const transferPlayer = onCall(async (req) => {
   const uid = requireAdmin(req);
@@ -204,11 +253,14 @@ export const decideRequest = onCall(async (req) => {
   const seasonRequest = r.type === 'join_season' || r.type === 'leave_season';
   let allowed = isAdminReq(req);
   // Season entry/exit is admin-only; captains decide join/transfer requests for their own team.
-  if (!allowed && !seasonRequest && r.toTeamId && r.type !== 'new_team') {
-    const [me, team] = await db.getAll(db.doc(`users/${uid}`), db.doc(`teams/${r.toTeamId}`));
+  const captainTeamId: string | null = r.type === 'leave_team' ? r.teamId || null : r.toTeamId || null;
+  // Removals a captain asked for need an admin.
+  const adminOnly = seasonRequest || r.type === 'kick_player';
+  if (!allowed && !adminOnly && captainTeamId && r.type !== 'new_team') {
+    const [me, team] = await db.getAll(db.doc(`users/${uid}`), db.doc(`teams/${captainTeamId}`));
     allowed = !!me.data()?.playerId && (team.data()?.captainIds || []).includes(me.data()!.playerId);
   }
-  if (!allowed) throw new HttpsError('permission-denied', seasonRequest ? 'Only admins can decide season requests.' : 'Only admins or the team captain can decide this.');
+  if (!allowed) throw new HttpsError('permission-denied', adminOnly ? 'Only admins can decide this request.' : 'Only admins or the team captain can decide this.');
 
   if (decision === 'decline') {
     await ref.update({ status: 'declined', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
@@ -246,6 +298,16 @@ export const decideRequest = onCall(async (req) => {
     await syncRolesFor([fromTeamId]);
     await announceMoves([{ playerId: r.playerId, fromTeamId, toTeamId: teamRef.id }]);
     return { status: 'accepted', teamId: teamRef.id };
+  }
+  if (r.type === 'leave_team' || r.type === 'kick_player') {
+    // The player may have moved on since asking; only release them from the team they asked to leave.
+    if (!r.teamId || !(await isOnTeam(seasonId, r.playerId, r.teamId))) {
+      await ref.update({ status: 'cancelled', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
+      throw new HttpsError('failed-precondition', 'That player is no longer on this team.');
+    }
+    await releasePlayer(seasonId, r.playerId, r.teamId, uid);
+    await ref.update({ status: 'accepted', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
+    return { status: 'accepted' };
   }
   let moved: { fromTeamId: string | null; toTeamId: string | null };
   if (seasonId) moved = await movePlayer(seasonId, r.playerId, r.toTeamId, uid, 'request');

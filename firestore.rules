@@ -81,13 +81,16 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.requestedBy == request.auth.uid
         && request.resource.data.status == 'pending'
-        && request.resource.data.type in ['join_team', 'transfer', 'new_team', 'join_season', 'leave_season']
+        && request.resource.data.type in ['join_team', 'transfer', 'new_team', 'join_season', 'leave_season', 'leave_team']
         && request.resource.data.playerId == myPlayerId()
-        // Player moves (join, transfer, new club) wait while the transfer window is closed.
+        // Player moves (join, transfer, new club, leaving a club) wait while the transfer window is closed.
         && (request.resource.data.type in ['join_season', 'leave_season'] || transfersOpen())
         // Only a team's captain may ask for it to join or leave a season (admins decide).
         && (!(request.resource.data.type in ['join_season', 'leave_season'])
-            || myPlayerId() in get(/databases/$(db)/documents/teams/$(request.resource.data.teamId)).data.captainIds);
+            || myPlayerId() in get(/databases/$(db)/documents/teams/$(request.resource.data.teamId)).data.captainIds)
+        // A player can only ask to leave the team they are on.
+        && (request.resource.data.type != 'leave_team'
+            || get(/databases/$(db)/documents/players/$(myPlayerId())).data.currentTeamId == request.resource.data.teamId);
       allow update: if isAdmin(); // captains and requesters decide/cancel via the Worker's decideRequest op
     }
 

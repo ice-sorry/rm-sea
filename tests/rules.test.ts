@@ -148,6 +148,15 @@ describe('self-service', () => {
     await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t2'), { color: '#ff8800' }));
     await assertFails(updateDoc(doc(as(USER), 'teams/t1'), { color: '#ff8800' }));
   });
+  it('players ask to leave only the team they are on, and only while transfers are open', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'players/p-mem'), { name: 'Mem', ownerUid: ROSTERED, currentTeamId: 't1' }));
+    const leave = (teamId: string) => addDoc(collection(as(ROSTERED), 'requests'),
+      { type: 'leave_team', teamId, playerId: 'p-mem', fromTeamId: teamId, toTeamId: null, seasonId: 's1', requestedBy: ROSTERED, status: 'pending' });
+    await assertSucceeds(leave('t1'));
+    await assertFails(leave('t2'));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'settings/general'), { currentSeasonId: 's1', transfersBlocked: true }));
+    await assertFails(leave('t1'));
+  });
   it('only a team captain can ask for the team to join or leave a season', async () => {
     const req = (type: string, teamId: string, by = CAPTAIN, playerId = 'p-cap') =>
       addDoc(collection(as(by), 'requests'), { type, teamId, seasonId: 's1', playerId, requestedBy: by, status: 'pending', toTeamId: null });

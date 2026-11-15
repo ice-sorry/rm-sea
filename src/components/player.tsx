@@ -12,7 +12,7 @@ import { fmtAgo, fmtDateTime, toLocalInput, ms } from '../lib/format';
 import { normalizeImageLink } from '../lib/images';
 import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Entry, MatchDoc, Position, RequestDoc } from '../lib/types';
-import { Bell, CircleCheck, Palette, Clock, DoorOpen, Inbox, Landmark, Lock, Pencil, Repeat, UserPlus } from 'lucide-react';
+import { Bell, CircleCheck, Palette, Clock, DoorOpen, Inbox, Landmark, Lock, Pencil, Repeat, UserMinus, UserPlus, Users } from 'lucide-react';
 
 // ---------- Own profile: edit ----------
 export function ProfileEditor() {
@@ -70,6 +70,8 @@ export function requestLabel(r: RequestDoc, teamName = '?', seasonName = 'the se
     case 'join_season': return `${teamName} → join ${seasonName}`;
     case 'leave_season': return `${teamName} → leave ${seasonName}`;
     case 'transfer': return `Transfer → ${teamName}`;
+    case 'leave_team': return `Leave ${teamName}`;
+    case 'kick_player': return `Remove a player from ${teamName}`;
     default: return `Join → ${teamName}`;
   }
 }
@@ -86,7 +88,7 @@ export function JoinTeamButton({ teamId }: { teamId: string }) {
   if (team?.active === false) return null;
   if (!L.authUser) return <SignInButton />;
   if (!p) return <a className="btn" href="#me"><UserPlus size={15} aria-hidden />Set up my player</a>;
-  if (p.currentTeamId === teamId) return null;
+  if (p.currentTeamId === teamId) return <LeaveTeamButton teamId={teamId} pending={mine.find((r) => r.status === 'pending' && r.type === 'leave_team' && r.teamId === teamId)} />;
   const pending = mine.find((r) => r.status === 'pending' && r.toTeamId === teamId);
   if (pending) return <span className="badge warn" style={{ fontSize: 13, padding: '6px 12px' }}>Request pending</span>;
   if (L.general.transfersBlocked) return <span className="badge" style={{ fontSize: 13, padding: '6px 12px' }} title="An admin has closed the transfer window"><Lock size={13} aria-hidden />Transfers closed</span>;
@@ -102,6 +104,38 @@ export function JoinTeamButton({ teamId }: { teamId: string }) {
         });
         setOpen(false); setMessage('');
       }, 'Request sent')}>Send</button>
+      <button className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
+    </span>
+  );
+}
+
+// ---------- Team page: ask to leave your own team (the captain or an admin decides) ----------
+function LeaveTeamButton({ teamId, pending }: { teamId: string; pending?: RequestDoc }) {
+  const L = useLeague();
+  const p = L.myPlayer!;
+  const { run, busy } = useAction();
+  const [openForm, setOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  // Captains would leave the team without a captain; an admin changes captains instead.
+  if (L.teams[teamId]?.captainIds?.includes(p.id)) return null;
+  if (pending) return (
+    <span className="row">
+      <span className="badge warn" style={{ fontSize: 13, padding: '6px 12px' }}>Leave request pending</span>
+      <button className="btn sm" disabled={busy} onClick={() => run(() => call('decideRequest')({ requestId: pending.id, decision: 'cancel' }), 'Cancelled')}>Cancel</button>
+    </span>
+  );
+  if (L.general.transfersBlocked) return null;
+  if (!openForm) return <button className="btn" onClick={() => setOpen(true)}><DoorOpen size={15} aria-hidden />Request to leave</button>;
+  return (
+    <span className="row wrap">
+      <input className="input" style={{ maxWidth: 260 }} placeholder="Message to the captain (optional)" value={message} maxLength={200} onChange={(e) => setMessage(e.target.value)} />
+      <button className="btn danger" disabled={busy} onClick={() => run(async () => {
+        await addDoc(collection(db, 'requests'), {
+          type: 'leave_team', teamId, playerId: p.id, fromTeamId: teamId, toTeamId: null,
+          seasonId: L.general.currentSeasonId || null, status: 'pending', message, requestedBy: L.authUser!.uid, createdAt: serverTimestamp(),
+        });
+        setOpen(false); setMessage('');
+      }, 'Leave request sent')}>Send</button>
       <button className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
     </span>
   );
@@ -132,21 +166,24 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
   const L = useLeague();
   const team = L.teams[teamId];
   const { run, busy } = useAction();
-  const { data: reqs } = useCol<RequestDoc>('requests', where('toTeamId', '==', teamId), where('status', '==', 'pending'));
+  const { data: joins } = useCol<RequestDoc>('requests', where('toTeamId', '==', teamId), where('status', '==', 'pending'));
+  const { data: teamReqs } = useCol<RequestDoc>('requests', where('teamId', '==', teamId), where('status', '==', 'pending'));
+  const reqs = [...joins, ...teamReqs.filter((r) => r.type === 'leave_team')];
   const fixtures = useMemo(() => L.matches.filter((m) => (m.homeTeamId === teamId || m.awayTeamId === teamId) && ['scheduled', 'agreed'].includes(m.status)).sort((a, b) => a.round - b.round).slice(0, 6), [L.matches, teamId]);
   return (
     <section>
       <SectionHeader eyebrow="Captain tools" title={team?.name || 'Team'} accent="HQ" />
       <SeasonEntryCard teamId={teamId} />
       <TeamIdentityCard teamId={teamId} />
+      <SquadCard teamId={teamId} />
       <div className="grid-2">
         <div className="card">
-          <h3><Bell size={18} aria-hidden />Join & transfer requests</h3>
+          <h3><Bell size={18} aria-hidden />Player requests</h3>
           {!reqs.length && <Empty>No pending requests.</Empty>}
           {reqs.map((r) => (
             <div key={r.id} className="row" style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
               <Avatar src={L.players[r.playerId]?.avatarUrl} name={L.players[r.playerId]?.name} size="sm" />
-              <span className="grow">{L.players[r.playerId]?.name}<Flag country={L.players[r.playerId]?.country} /><br /><span className="small muted">{r.message || (r.type === 'transfer' ? `from ${L.teams[r.fromTeamId || '']?.name}` : 'free agent')}</span></span>
+              <span className="grow">{L.players[r.playerId]?.name}<Flag country={L.players[r.playerId]?.country} /><br /><span className="small muted">{r.type === 'leave_team' ? <b>Wants to leave</b> : r.type === 'transfer' ? `from ${L.teams[r.fromTeamId || '']?.name}` : 'free agent'}{r.message ? ` · ${r.message}` : ''}</span></span>
               <button className="btn sm primary" disabled={busy} onClick={() => run(() => call('decideRequest')({ requestId: r.id, decision: 'accept' }), 'Accepted')}>Accept</button>
               <button className="btn sm" disabled={busy} onClick={() => run(() => call('decideRequest')({ requestId: r.id, decision: 'decline' }), 'Declined')}>Decline</button>
             </div>
@@ -165,6 +202,49 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// ---------- Team page: remove players (captains and admins) ----------
+function SquadCard({ teamId }: { teamId: string }) {
+  const L = useLeague();
+  const team = L.teams[teamId];
+  const { run, busy } = useAction();
+  // Same squad the team page shows: the season roster, or the club's players between seasons.
+  const ids = L.rosters[teamId] || L.playerList.filter((p) => p.currentTeamId === teamId).map((p) => p.id);
+  const players = ids.map((id) => L.players[id]).filter(Boolean);
+  const closed = !!L.general.transfersBlocked && !L.isAdmin;
+  const { data: teamReqs } = useCol<RequestDoc>('requests', where('teamId', '==', teamId), where('status', '==', 'pending'));
+  const removal = (pid: string) => teamReqs.find((r) => r.type === 'kick_player' && r.playerId === pid);
+  return (
+    <div className="card" style={{ marginBottom: 'var(--s4)' }}>
+      <h3><Users size={18} aria-hidden />Squad</h3>
+      {!players.length && <Empty>No players on the team.</Empty>}
+      {players.map((p) => {
+        const captain = !!team?.captainIds?.includes(p.id);
+        return (
+          <div key={p.id} className="row" style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+            <Avatar src={p.avatarUrl} name={p.name} size="sm" />
+            <span className="grow">{p.name}<Flag country={p.country} />{captain && <span className="badge ok" style={{ marginLeft: 6 }}>C</span>}</span>
+            {!captain && (removal(p.id) ? (
+              <span className="row" style={{ gap: 6 }}>
+                <span className="badge warn">Removal pending</span>
+                {removal(p.id)!.requestedBy === L.authUser?.uid && <button className="btn sm ghost" disabled={busy} onClick={() => run(() => call('decideRequest')({ requestId: removal(p.id)!.id, decision: 'cancel' }), 'Cancelled')}>Cancel</button>}
+              </span>
+            ) : (
+              <button className="btn sm danger" disabled={busy || closed} title={closed ? 'Transfers are closed' : undefined}
+                onClick={() => {
+                  const ask = L.isAdmin ? `Remove ${p.name} from ${team?.name}? They become a free agent.` : `Ask an admin to remove ${p.name} from ${team?.name}?`;
+                  if (window.confirm(ask)) run(() => call<unknown, { requested?: boolean }>('kickPlayer')({ teamId, playerId: p.id }), (r) => r?.requested ? 'Removal sent to the admins' : `${p.name} removed`);
+                }}>
+                <UserMinus size={14} aria-hidden />Remove
+              </button>
+            ))}
+          </div>
+        );
+      })}
+      <p className="small muted">{closed ? "Transfers are closed, so players can't be removed right now." : L.isAdmin ? "Removed players become free agents. Captains can't be removed; change captains in Admin → League → Teams first." : "An admin approves each removal; the player then becomes a free agent. Captains can't be removed here."}</p>
+    </div>
   );
 }
 

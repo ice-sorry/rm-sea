@@ -17,7 +17,7 @@ export interface UserDoc {
   role: 'user' | 'admin' | 'owner'; guildRoleIds: string[]; playerId: string | null;
 }
 export interface RequestDoc {
-  id: string; type: 'join_team' | 'transfer' | 'new_team' | 'join_season' | 'leave_season'; playerId: string; teamId?: string; fromTeamId: string | null; toTeamId: string | null;
+  id: string; type: 'join_team' | 'transfer' | 'new_team' | 'join_season' | 'leave_season' | 'leave_team' | 'kick_player'; playerId: string; teamId?: string; fromTeamId: string | null; toTeamId: string | null;
   seasonId: string; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; message: string; teamName?: string; color?: string;
   requestedBy: string; decidedBy?: string; createdAt?: Timestamp; decidedAt?: Timestamp;
 }
