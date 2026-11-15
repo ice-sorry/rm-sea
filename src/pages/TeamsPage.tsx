@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { CSSProperties, useEffect, useState } from 'react';
 import { collection, getDocs, serverTimestamp } from 'firebase/firestore';
 import { addDoc } from '../lib/db';
 import { db } from '../lib/firebase';
@@ -33,7 +33,7 @@ export default function TeamsPage() {
             {teams.map((t) => {
               const mine = (awards || []).filter((a) => a.recipientId === t.id);
               return (
-                <a key={t.id} className="team-row" href={teamHref(t.id)} style={{ boxShadow: `inset 6px 0 0 ${t.color}` }}>
+                <a key={t.id} className="team-row" href={teamHref(t.id)} style={{ '--team': t.color || 'var(--accent)' } as CSSProperties}>
                   <Crest team={t} size="lg" />
                   <div className="grow" style={{ minWidth: 0 }}>
                     <div className="team-name">{t.name}</div>
