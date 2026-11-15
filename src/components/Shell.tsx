@@ -45,7 +45,7 @@ export function TopBar({ route }: { route: string }) {
             {menu && (
               <div className="overflow-menu" style={{ position: 'absolute', top: 40, right: 0, bottom: 'auto' }} onClick={() => setMenu(false)}>
                 <div className="small muted" style={{ padding: '6px 12px' }}>{L.me?.displayName || L.authUser.uid}</div>
-                {L.myPlayer && <a href={`#player/${encodeURIComponent(L.myPlayer.id)}`}>👤 My profile</a>}
+                {L.myPlayer && <a href={`#player/${encodeURIComponent(L.myPlayer.id)}`}>👔 My profile</a>}
                 {L.myPlayer?.currentTeamId && L.teams[L.myPlayer.currentTeamId] && <a href={teamHref(L.myPlayer.currentTeamId)}>🛡️ My team</a>}
                 {!L.myPlayer && <a href="#me">🙋 Set up my player</a>}
                 {L.isAdmin && <a href="#admin">🛠️ Admin Panel</a>}
@@ -93,8 +93,7 @@ export function MobileNav({ route }: { route: string }) {
       {more && (
         <div className="overflow-menu" onClick={() => setMore(false)}>
           {rest.map((n) => <a key={n.route} href={`#${n.route}`}>{n.emoji} {n.label}</a>)}
-          <a href="#cup">🏆 Current cup</a>
-          {myPlayer && <a href={`#player/${encodeURIComponent(myPlayer.id)}`}>👤 My profile</a>}
+          {myPlayer && <a href={`#player/${encodeURIComponent(myPlayer.id)}`}>👔 My profile</a>}
           {myPlayer?.currentTeamId && teams[myPlayer.currentTeamId] && <a href={teamHref(myPlayer.currentTeamId)}>🛡️ My team</a>}
           {authUser && !myPlayer && <a href="#me">🙋 Set up my player</a>}
           {isAdmin && <a href="#admin">🛠️ Admin Panel</a>}
