@@ -16,7 +16,8 @@ export function AdminTransfers() {
     L.seasonId ? `seasons/${L.seasonId}/transfers` : null, orderBy('createdAt', 'desc'));
   const nextRound = Math.max(0, ...L.matches.filter((m) => m.status === 'played' && m.stage === 'league').map((m) => m.round)) + 1;
   const [f, setF] = useState({ playerId: '', toTeamId: '', startingRound: nextRound });
-  const from = f.playerId ? Object.entries(L.rosters).find(([, ps]) => ps.includes(f.playerId))?.[0] : undefined;
+  // Season roster first; a club that hasn't entered the season has no roster, so fall back to the player's team.
+  const from = f.playerId ? Object.entries(L.rosters).find(([, ps]) => ps.includes(f.playerId))?.[0] || L.players[f.playerId]?.currentTeamId || undefined : undefined;
   return (
     <>
       <SectionHeader eyebrow={`Moves · ${L.season?.name || ''}`} title="Mid-season" accent="transfers" />

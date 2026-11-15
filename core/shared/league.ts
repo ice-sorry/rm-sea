@@ -9,6 +9,12 @@ export const POSITION_LABELS: Record<Position, string> = {
   GK: 'Goalkeeper', DF: 'Defender', MF: 'Midfielder', WF: 'Wing Forward', ST: 'Striker', UNSURE: 'Flexible',
 };
 
+/**
+ * Season statuses during which roster moves are written to the transfer log (Admin → Moves, home page).
+ * null logs moves at every stage, including pre-season registration. e.g. ['live', 'finals'] for mid-season only.
+ */
+export const TRANSFER_LOG_STATUSES: string[] | null = null;
+
 export type Stage = 'league' | 'wildcard' | 'qf' | 'sf' | 'final' | 'cup';
 export type MatchStatus = 'scheduled' | 'agreed' | 'played' | 'void';
 export type SeasonStatus = 'draft' | 'signups' | 'live' | 'finals' | 'complete';

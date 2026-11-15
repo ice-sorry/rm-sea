@@ -1,7 +1,7 @@
 import { onCall, HttpsError, invoke, CallableRequest } from './runtime';
 import { db, FieldValue, requireAuth, requireAdmin, roleOf, currentSeasonId, getSettings, DISCORD_BOT_TOKEN, auditNote } from './admin';
 import { avatarUrl, discordApi } from './discord';
-import { POSITIONS, Position } from './shared/league';
+import { POSITIONS, Position, TRANSFER_LOG_STATUSES } from './shared/league';
 
 const isAdminReq = (req: CallableRequest) => ['admin', 'owner'].includes(roleOf(req));
 
@@ -95,14 +95,16 @@ export async function movePlayer(seasonId: string, playerId: string, toTeamId: s
   const season = (await db.doc(`seasons/${seasonId}`).get()).data() || {};
   const rosters = await db.collection(`seasons/${seasonId}/rosters`).get();
   const from = rosters.docs.find((d) => (d.data()!.playerIds || []).includes(playerId));
-  const fromTeamId = from?.id || null;
+  const currentSeason = await currentSeasonId();
+  // A player on a club that hasn't entered this season has no season roster, but still has a team: fall back to
+  // currentTeamId so the move (and the transfer log) records where they came from instead of "free agent".
+  const fromTeamId = from?.id || (currentSeason === seasonId ? ((await db.doc(`players/${playerId}`).get()).data()?.currentTeamId as string) || null : null);
   if (fromTeamId === toTeamId) return { fromTeamId, toTeamId };
   const batch = db.batch();
   if (from) batch.update(from.ref, { playerIds: FieldValue.arrayRemove(playerId), updatedAt: FieldValue.serverTimestamp(), updatedBy: actor });
   if (toTeamId) batch.set(db.doc(`seasons/${seasonId}/rosters/${toTeamId}`), { playerIds: FieldValue.arrayUnion(playerId), updatedAt: FieldValue.serverTimestamp(), updatedBy: actor }, { merge: true });
-  const currentSeason = await currentSeasonId();
   if (currentSeason === seasonId) batch.update(db.doc(`players/${playerId}`), { currentTeamId: toTeamId, updatedAt: FieldValue.serverTimestamp() });
-  if (['live', 'finals'].includes(season.status) && toTeamId) {
+  if ((!TRANSFER_LOG_STATUSES || TRANSFER_LOG_STATUSES.includes(season.status)) && toTeamId) {
     batch.set(db.collection(`seasons/${seasonId}/transfers`).doc(), {
       playerId, fromTeamId, toTeamId, startingRound: startingRound ?? (await nextRound(seasonId)), source,
       createdAt: FieldValue.serverTimestamp(), createdBy: actor,
