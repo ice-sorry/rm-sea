@@ -68,19 +68,34 @@ function Discord() {
   const { run, busy } = useAction();
   const [f, setF] = useSettingsForm('settings/integrations', {
     guildId: '1562776724431831050', matchReportChannelId: '', alertsChannelId: '', rosterChannelId: '', autoPost: true, autoPostOnEdit: false,
+    discordEnabled: true, rosterPosts: true, roleSync: true, matchThreads: true,
   });
+  // Older settings docs lack the switches; a missing switch counts as on (the Worker reads it the same way).
+  const on = (k: 'discordEnabled' | 'rosterPosts' | 'roleSync' | 'matchThreads') => f[k] !== false;
+  const toggle = (k: 'discordEnabled' | 'rosterPosts' | 'roleSync' | 'matchThreads', label: string, hint: string) => (
+    <label className="check" title={hint}><input type="checkbox" disabled={k !== 'discordEnabled' && !on('discordEnabled')} checked={on(k)} onChange={(e) => setF({ ...f, [k]: e.target.checked })} />{label}</label>
+  );
   const text = (k: keyof typeof f, label: string) => <Field label={label}><input className="input" value={String(f[k] ?? '')} onChange={(e) => setF({ ...f, [k]: e.target.value.trim() })} /></Field>;
   return (
     <div className="stack">
+      <div className="card stack">
+        <h3 style={{ margin: 0 }}>Discord features</h3>
+        <div className="row wrap">{toggle('discordEnabled', 'Discord on', 'Master switch: off stops every bot post, role change and webhook')}</div>
+        <div className="row wrap">
+          {toggle('rosterPosts', 'Roster move posts', 'Post when a player signs for or leaves a team')}
+          {toggle('roleSync', 'Team role sync', 'Give and remove team roles when rosters change')}
+          {toggle('matchThreads', 'Matchweek threads', 'Create and rename fixture threads')}
+          <label className="check"><input type="checkbox" disabled={!on('discordEnabled')} checked={!!f.autoPost} onChange={(e) => setF({ ...f, autoPost: e.target.checked })} />Auto-post results</label>
+          <label className="check"><input type="checkbox" disabled={!on('discordEnabled') || !f.autoPost} checked={!!f.autoPostOnEdit} onChange={(e) => setF({ ...f, autoPostOnEdit: e.target.checked })} />…and when a result is edited</label>
+        </div>
+        <p className="small muted" style={{ margin: 0 }}>With Discord off, nothing is sent to Discord: no posts, role changes, threads, rules or results. Sign-in with Discord keeps working. Turning role sync back on doesn't catch up on its own; press <b>Sync team roles</b> below.</p>
+        <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/integrations'), f, { merge: true }), 'Saved')}>Save</button>
+      </div>
       <div className="card stack">
         <div className="form-grid">
           {text('guildId', 'Guild (server) ID')}{text('matchReportChannelId', 'Match report channel ID')}{text('alertsChannelId', 'Alerts channel ID')}{text('rosterChannelId', 'Roster moves channel ID')}
         </div>
         <p className="small muted" style={{ margin: 0 }}>Roster moves: the bot posts there when a player signs for or leaves a team. Leave it blank to turn the posts off. The bot needs Send Messages and Embed Links in that channel.</p>
-        <div className="row wrap">
-          <label className="check"><input type="checkbox" checked={!!f.autoPost} onChange={(e) => setF({ ...f, autoPost: e.target.checked })} />Auto-post results to Discord</label>
-          <label className="check"><input type="checkbox" checked={!!f.autoPostOnEdit} onChange={(e) => setF({ ...f, autoPostOnEdit: e.target.checked })} />…and when a result is edited</label>
-        </div>
         <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/integrations'), f, { merge: true }), 'Saved')}>Save</button>
       </div>
       <div className="card row wrap">

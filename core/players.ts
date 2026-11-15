@@ -1,5 +1,5 @@
 import { onCall, HttpsError, invoke, CallableRequest } from './runtime';
-import { db, FieldValue, requireAuth, requireAdmin, roleOf, currentSeasonId, getSettings, DISCORD_BOT_TOKEN, auditNote } from './admin';
+import { db, FieldValue, requireAuth, requireAdmin, roleOf, currentSeasonId, getSettings, discordAllowed, DISCORD_BOT_TOKEN, auditNote } from './admin';
 import { avatarUrl, discordApi } from './discord';
 import { POSITIONS, Position, TRANSFER_LOG_STATUSES } from './shared/league';
 
@@ -142,11 +142,11 @@ export const notifyRosterMove = onCall(async (req) => {
   const token = DISCORD_BOT_TOKEN.value();
   if (!moves.length || !token) return { posted: 0 };
   const [integ, general] = await Promise.all([
-    getSettings<{ rosterChannelId?: string }>('integrations'),
+    getSettings<{ rosterChannelId?: string; discordEnabled?: boolean; rosterPosts?: boolean }>('integrations'),
     getSettings<{ siteUrl?: string }>('general'),
   ]);
   const channelId = String(integ.rosterChannelId || '').trim();
-  if (!channelId) return { posted: 0 };
+  if (!channelId || !discordAllowed(integ, 'rosterPosts')) return { posted: 0 };
   const paths = [...new Set(moves.flatMap((m) => [`players/${m.playerId}`, m.fromTeamId ? `teams/${m.fromTeamId}` : '', m.toTeamId ? `teams/${m.toTeamId}` : '']).filter(Boolean))];
   const snaps = await db.getAll(...paths.map((x) => db.doc(x)));
   const data = new Map(paths.map((x, i) => [x, snaps[i].data() || {}]));

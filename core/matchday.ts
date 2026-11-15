@@ -1,5 +1,5 @@
 import { onCall, HttpsError, logger } from './runtime';
-import { db, FieldValue, Timestamp, getSettings, requireAdmin, requireAuth, roleOf, currentSeasonId, DISCORD_BOT_TOKEN, DISCORD_PUBLIC_KEY, DISCORD_CLIENT_ID, DISCORD_GUILD_ID } from './admin';
+import { db, FieldValue, Timestamp, getSettings, discordAllowed, requireDiscordOn, requireAdmin, requireAuth, roleOf, currentSeasonId, DISCORD_BOT_TOKEN, DISCORD_PUBLIC_KEY, DISCORD_CLIENT_ID, DISCORD_GUILD_ID } from './admin';
 import { discordApi, verifyDiscordSignature } from './discord';
 import { Match, StandingRow } from './shared/league';
 
@@ -17,6 +17,7 @@ export const publishMatchweek = onCall(async (req) => {
   const uid = requireAdmin(req);
   const { seasonId, weekNo } = req.data as { seasonId: string; weekNo: number };
   const integ = await getSettings<{ matchReportChannelId?: string }>('integrations');
+  if (!discordAllowed(integ, 'matchThreads')) throw new HttpsError('failed-precondition', 'Match threads are turned off in Settings → Discord & roles.');
   if (!integ.matchReportChannelId) throw new HttpsError('failed-precondition', 'Set the match report channel in Settings → Discord.');
   const token = DISCORD_BOT_TOKEN.value();
   const teams = await names();
@@ -48,6 +49,7 @@ export const publishMatchweek = onCall(async (req) => {
 
 export const completeMatchweek = onCall(async (req) => {
   requireAdmin(req);
+  await requireDiscordOn('matchThreads');
   const { seasonId, weekNo } = req.data as { seasonId: string; weekNo: number };
   const token = DISCORD_BOT_TOKEN.value();
   const teams = await names();
@@ -134,6 +136,7 @@ export const agreeKickoff = onCall(async (req) => {
 /** Register /standings and /next as guild commands. */
 export const registerCommands = onCall(async (req) => {
   requireAdmin(req);
+  await requireDiscordOn();
   await discordApi(DISCORD_BOT_TOKEN.value(), 'PUT', `/applications/${DISCORD_CLIENT_ID.value()}/guilds/${DISCORD_GUILD_ID.value()}/commands`, [
     { name: 'standings', description: 'Current league table', type: 1 },
     { name: 'next', description: 'Next scheduled games', type: 1 },

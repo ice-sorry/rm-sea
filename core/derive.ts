@@ -1,6 +1,6 @@
 import { onCall, logger, invoke } from './runtime';
 import type { QuerySnapshot, WriteBatch } from './firestore';
-import { db, FieldValue, getSettings, getPrivateDiscord, requireAdmin } from './admin';
+import { db, FieldValue, getSettings, getPrivateDiscord, discordAllowed, requireAdmin } from './admin';
 import { webhookPost } from './discord';
 import {
   Bracket, BracketSlot, Entry, Match, Season, DEFAULT_SEASON, summarizeSeries, computeStandings, computePlayerStats,
@@ -271,7 +271,7 @@ export const matchSideEffects = onCall(async (req) => {
       if (key) {
         const edited = !!prev;
         const integ = await getSettings<{ autoPost?: boolean; autoPostOnEdit?: boolean }>('integrations');
-        if ((!edited && integ.autoPost) || (edited && integ.autoPostOnEdit)) await postResult(seasonId, m, edited).catch((e) => logger.warn(e));
+        if (discordAllowed(integ) && ((!edited && integ.autoPost) || (edited && integ.autoPostOnEdit))) await postResult(seasonId, m, edited).catch((e) => logger.warn(e));
       }
       await ref.update({ postedResultKey: key });
     }
