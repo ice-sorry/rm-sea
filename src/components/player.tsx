@@ -9,6 +9,8 @@ import { useCol, useDoc } from '../lib/hooks';
 import { SectionHeader, Empty, Crest, Avatar, Field, Flag, CountrySelect, useAction } from './ui';
 import { SignInButton } from './Shell';
 import { fmtAgo, fmtDateTime, toLocalInput, ms } from '../lib/format';
+import { normalizeImageLink } from '../lib/images';
+import { Palette } from 'lucide-react';
 import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Entry, MatchDoc, Position, RequestDoc } from '../lib/types';
 
@@ -136,7 +138,7 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
     <section>
       <SectionHeader eyebrow="Captain tools" title={team?.name || 'Team'} accent="HQ" />
       <SeasonEntryCard teamId={teamId} />
-      <TeamColorCard teamId={teamId} />
+      <TeamIdentityCard teamId={teamId} />
       <div className="grid-2">
         <div className="card">
           <h3>🔔 Join & transfer requests</h3>
@@ -166,25 +168,53 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
   );
 }
 
-// ---------- Team page: team colour (captains and admins) ----------
-function TeamColorCard({ teamId }: { teamId: string }) {
+// ---------- Team page: colour, abbreviation and logo (captains and admins) ----------
+function TeamIdentityCard({ teamId }: { teamId: string }) {
   const L = useLeague();
   const team = L.teams[teamId];
   const { run, busy } = useAction();
-  const [color, setColor] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ color: string; shortName: string; crestUrl: string } | null>(null);
   if (!team) return null;
-  const current = /^#[0-9a-f]{6}$/i.test(team.color || '') ? team.color : '#1D8ADE';
-  const value = color ?? current;
+  const saved = {
+    color: /^#[0-9a-f]{6}$/i.test(team.color || '') ? team.color : '#1D8ADE',
+    shortName: (team.shortName || team.name.slice(0, 4)).toUpperCase().slice(0, 4),
+    crestUrl: team.crestUrl || '',
+  };
+  const f = draft ?? saved;
+  const set = (patch: Partial<typeof f>) => setDraft({ ...f, ...patch });
+  const dirty = f.color.toLowerCase() !== saved.color.toLowerCase() || f.shortName !== saved.shortName || f.crestUrl.trim() !== saved.crestUrl;
   return (
-    <div className="card row wrap" style={{ marginBottom: 'var(--s4)' }}>
-      <h3 style={{ margin: 0 }}>🎨 Team colour</h3>
-      <input type="color" value={value} onChange={(e) => setColor(e.target.value)} style={{ width: 64, height: 36 }} aria-label="Team colour" />
-      <Crest team={{ ...team, color: value }} />
-      <span className="grow small muted">Used for the crest, team chips, the teams list and Discord posts.</span>
-      <button className="btn sm primary" disabled={busy || value.toLowerCase() === current.toLowerCase()} onClick={() => run(async () => {
-        await updateDoc(doc(db, 'teams', teamId), { color: value });
-        setColor(null);
-      }, 'Team colour saved')}>Save colour</button>
+    <div className="card stack" style={{ marginBottom: 'var(--s4)' }}>
+      <h3 className="row" style={{ margin: 0 }}><Palette size={20} />Team identity</h3>
+      <div className="row wrap" style={{ alignItems: 'flex-end', gap: 'var(--s4)' }}>
+        <Crest team={{ ...team, ...f, crestUrl: f.crestUrl.trim() }} size="lg" />
+        <Field label="Abbreviation (max 4)">
+          <input className="input" style={{ width: 110, textTransform: 'uppercase' }} maxLength={4} value={f.shortName}
+            onChange={(e) => set({ shortName: e.target.value.replace(/\s+/g, '').toUpperCase().slice(0, 4) })} />
+        </Field>
+        <Field label="Colour"><input type="color" value={f.color} onChange={(e) => set({ color: e.target.value })} style={{ width: 64, height: 38 }} aria-label="Team colour" /></Field>
+      </div>
+      <Field label="Logo image link">
+        <input className="input" placeholder="https://cdn.discordapp.com/attachments/…" value={f.crestUrl} onChange={(e) => set({ crestUrl: e.target.value })} />
+      </Field>
+      <div className="small muted">
+        <b>How to add your logo</b>
+        <ol style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+          <li>Create a post for your team in <b>#teams-hub</b> on Discord (use your team's name).</li>
+          <li>Post your logo image there (ideally square, 128×128 px).</li>
+          <li>Right-click the image → <b>Copy Image Link</b>.</li>
+          <li>Paste the link into the box above and save.</li>
+        </ol>
+        The logo replaces the coloured badge across the site. Leave the box empty to use the badge.
+      </div>
+      <div className="row">
+        <button className="btn sm primary" disabled={busy || !dirty || f.shortName.length < 1} onClick={() => run(async () => {
+          const crestUrl = f.crestUrl.trim() ? normalizeImageLink(f.crestUrl) : '';
+          await updateDoc(doc(db, 'teams', teamId), { color: f.color, shortName: f.shortName, crestUrl });
+          setDraft(null);
+        }, 'Team identity saved')}>Save</button>
+        {dirty && <button className="btn sm ghost" onClick={() => setDraft(null)}>Reset</button>}
+      </div>
     </div>
   );
 }

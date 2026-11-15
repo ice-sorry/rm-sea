@@ -31,7 +31,7 @@ beforeEach(async () => {
     await setDoc(doc(d, 'seasons/s1/derived/standings'), { rows: [] });
     await setDoc(doc(d, `users/${USER}`), { discordId: '200', role: 'user', playerId: null });
     await setDoc(doc(d, `users/${CAPTAIN}`), { discordId: '500', role: 'user', playerId: 'p-cap' });
-    await setDoc(doc(d, 'teams/t1'), { name: 'Team 1', captainIds: ['p-cap'] });
+    await setDoc(doc(d, 'teams/t1'), { name: 'Team 1', shortName: 'T1', color: '#1D8ADE', crestUrl: '', captainIds: ['p-cap'] });
     await setDoc(doc(d, 'teams/t2'), { name: 'Team 2', captainIds: [] });
     await setDoc(doc(d, 'players/p1'), { name: 'P1', ownerUid: null });
     await setDoc(doc(d, 'players/p-cap'), { name: 'Cap', ownerUid: CAPTAIN, bio: '' });
@@ -136,8 +136,13 @@ describe('self-service', () => {
     await assertFails(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'new_team', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'pending', toTeamId: null, teamName: 'X' }));
     await assertSucceeds(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'join_season', teamId: 't1', seasonId: 's1', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'pending', toTeamId: null }));
   });
-  it('captains change only their own team colour', async () => {
+  it('captains edit only their own team colour, abbreviation and logo link', async () => {
     await assertSucceeds(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { color: '#ff8800' }));
+    await assertSucceeds(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { shortName: 'ABCD', crestUrl: 'https://cdn.discordapp.com/attachments/1/2/logo.png' }));
+    await assertSucceeds(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { crestUrl: '' }));
+    await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { shortName: 'TOOLONG' }));
+    await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { shortName: '' }));
+    await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { crestUrl: 'javascript:alert(1)' }));
     await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { color: 'red' }));
     await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t1'), { color: '#ff8800', name: 'Renamed' }));
     await assertFails(updateDoc(doc(as(CAPTAIN), 'teams/t2'), { color: '#ff8800' }));

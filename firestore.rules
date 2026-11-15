@@ -47,9 +47,12 @@ service cloud.firestore {
     match /teams/{id} {
       allow read: if true;
       allow write: if isAdmin();
-      // Captains change their own team's colour (a #rrggbb hex) and nothing else.
-      allow update: if signedIn() && changed().hasOnly(['color'])
-        && request.resource.data.color is string && request.resource.data.color.matches('^#[0-9a-fA-F]{6}$')
+      // Captains edit their own team's colour (#rrggbb), abbreviation (1-4 characters) and logo link (https or blank).
+      allow update: if signedIn() && changed().hasOnly(['color', 'shortName', 'crestUrl'])
+        && request.resource.data.get('color', '') is string && request.resource.data.get('color', '').matches('^#[0-9a-fA-F]{6}$')
+        && request.resource.data.get('shortName', '') is string && request.resource.data.get('shortName', '').size() >= 1 && request.resource.data.get('shortName', '').size() <= 4
+        && request.resource.data.get('crestUrl', '') is string && request.resource.data.get('crestUrl', '').size() <= 500
+        && (request.resource.data.get('crestUrl', '') == '' || request.resource.data.get('crestUrl', '').matches('^https://[^ ]+$'))
         && myPlayerId() in resource.data.get('captainIds', []);
     }
 
