@@ -20,11 +20,11 @@ export const NAV: NavItem[] = [
   { route: 'home', label: 'Home', emoji: '🏠' },
   { route: 'table', label: 'Table', emoji: '📊' },
   { route: 'teams', label: 'Teams', emoji: '🛡️' },
-  { route: 'stats', label: 'Statistics', emoji: '📈' },
+  { route: 'players', label: 'Players', emoji: '👤' },
   { route: 'fixtures', label: 'Fixtures', emoji: '🗓️' },
+  { route: 'stats', label: 'Statistics', emoji: '📈' },
   { route: 'cups', label: 'Cups', emoji: '🏆' },
   { route: 'awards', label: 'Awards', emoji: '🏅' },
-  { route: 'players', label: 'Players', emoji: '👤' },
 ];
 
 /** Feature switches. Flip to true to bring a feature back. */
