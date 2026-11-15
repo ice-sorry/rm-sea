@@ -69,6 +69,7 @@ img { max-width: 100%; }
 .page-header .view-all, .page-header a { color: #fff; }
 @media (min-width: 900px) { .page-header-inner { min-height: 220px; padding: 56px var(--s6); } }
 .page-header .title .flag { margin-left: 12px; vertical-align: middle; }
+.page-header-sub { margin-top: var(--s2); font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: 3px; color: rgba(255,255,255,.75); }
 .page.home-page { padding-bottom: 96px; }
 
 /* ---------- Home: main column + standings sidebar ---------- */

@@ -34,6 +34,7 @@ export default function TeamPage({ id }: { id: string }) {
       <PageHeader
         eyebrow={row ? <>{L.season?.name} · {ordinal(row.pos)} · {row.pts} pts</> : L.season?.name || 'Team'}
         title={t.name}
+        subtitle={t.shortName || undefined}
         right={<span className="row wrap">{row && <FormPills form={row.form} />}<JoinTeamButton teamId={id} /></span>}>
         <Crest team={t} size="lg" />
       </PageHeader>

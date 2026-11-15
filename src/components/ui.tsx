@@ -23,8 +23,8 @@ export function SectionHeader({ eyebrow, title, accent, link, linkLabel = 'View 
 }
 
 /** Full-width band in the brand colour at the top of every main page. Render it before <main className="page">. */
-export function PageHeader({ eyebrow, title, accent, titleAfter, right, children }: {
-  eyebrow?: ReactNode; title: string; accent?: string; titleAfter?: ReactNode; right?: ReactNode; children?: ReactNode;
+export function PageHeader({ eyebrow, title, accent, titleAfter, subtitle, right, children }: {
+  eyebrow?: ReactNode; title: string; accent?: string; titleAfter?: ReactNode; subtitle?: ReactNode; right?: ReactNode; children?: ReactNode;
 }) {
   return (
     <header className="page-header">
@@ -33,6 +33,7 @@ export function PageHeader({ eyebrow, title, accent, titleAfter, right, children
         <div className="grow" style={{ minWidth: 0 }}>
           {eyebrow && <div className="eyebrow">{eyebrow}</div>}
           <h1 className="title">{title}{accent && <> <em>{accent}</em></>}{titleAfter}</h1>
+          {subtitle && <div className="page-header-sub">{subtitle}</div>}
         </div>
         {right}
       </div>
