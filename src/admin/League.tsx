@@ -216,7 +216,7 @@ export function AdminRosters() {
     if (isCurrent) b.update(doc(db, 'players', pid), { currentTeamId: null, updatedAt: serverTimestamp() });
     await b.commit();
     await syncTeamRoles(teamId);
-    if (isCurrent) await notifyRosterMove({ playerId: pid, fromTeamId: teamId, toTeamId: null });
+    if (isCurrent) await notifyRosterMove({ playerId: pid, fromTeamId: teamId, toTeamId: null, removed: true });
   }, 'Removed');
   const copy = () => run(async () => {
     const src = await getDocs(collection(db, `seasons/${copyFrom}/rosters`));

@@ -14,7 +14,7 @@ export async function afterMatchChange(path: string, resultChanged = true) {
 
 /** Sync Discord team roles for rosters that just changed (best-effort; replaces the onRosterWrite trigger). */
 /** Best-effort Discord post to the roster moves channel (no-op when the channel isn't set). */
-export const notifyRosterMove = (...moves: { playerId: string; fromTeamId: string | null; toTeamId: string | null }[]) =>
+export const notifyRosterMove = (...moves: { playerId: string; fromTeamId: string | null; toTeamId: string | null; removed?: boolean }[]) =>
   call('notifyRosterMove')({ moves }).catch(() => undefined);
 export const syncTeamRoles = (...teamIds: (string | null | undefined)[]) =>
   call('syncTeamRoles')({ teamIds: teamIds.filter(Boolean) }).catch(() => undefined);

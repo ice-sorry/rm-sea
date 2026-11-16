@@ -120,7 +120,8 @@ export async function syncRolesFor(teamIds: (string | null)[]) {
   if (ids.length) await invoke('syncTeamRoles', { teamIds: ids }).catch(() => undefined);
 }
 
-export interface RosterMove { playerId: string; fromTeamId: string | null; toTeamId: string | null }
+/** `removed`: an admin took the player off the team (a kick), rather than the player leaving. */
+export interface RosterMove { playerId: string; fromTeamId: string | null; toTeamId: string | null; removed?: boolean }
 
 /** Best-effort Discord post for players who signed for or left a team (needs the bot token, so it runs in the Worker). */
 export async function announceMoves(moves: RosterMove[]) {
@@ -158,6 +159,7 @@ export const notifyRosterMove = onCall(async (req) => {
     const who = `**${p.name || 'A player'}**${p.discordId ? ` (<@${p.discordId}>)` : ''}`;
     const fromName = from?.name || 'their team', toName = to?.name || 'a new team';
     const [title, description] = !m.fromTeamId ? ['✍️ Signed', `${who} has signed for **${toName}**.`]
+      : !m.toTeamId && m.removed ? ['🚫 Removed from team', `${who} has been removed from **${fromName}** and is now a free agent.`]
       : !m.toTeamId ? ['👋 Left team', `${who} has left **${fromName}** and is now a free agent.`]
       : ['🔁 Transfer', `${who} has left **${fromName}** and signed for **${toName}**.`];
     return {
@@ -179,16 +181,16 @@ async function isOnTeam(seasonId: string | null, playerId: string, teamId: strin
 }
 
 /** Make a player a free agent, then sync roles and announce it. Callers check permissions and team membership. */
-async function releasePlayer(seasonId: string | null, playerId: string, teamId: string, uid: string) {
+async function releasePlayer(seasonId: string | null, playerId: string, teamId: string, uid: string, removed = false) {
   if (seasonId) await movePlayer(seasonId, playerId, null, uid, 'request');
   else await db.doc(`players/${playerId}`).update({ currentTeamId: null, updatedAt: FieldValue.serverTimestamp() });
   await syncRolesFor([teamId]);
-  await announceMoves([{ playerId, fromTeamId: teamId, toTeamId: null }]);
+  await announceMoves([{ playerId, fromTeamId: teamId, toTeamId: null, removed }]);
 }
 
 /**
- * Remove a player from a team. Admins remove straight away; a captain's removal becomes a request an admin approves.
- * Captains can't ask while the transfer window is closed.
+ * Ask for a player to be removed from a team. Every removal is a request that an admin approves in
+ * Admin → Moves → Requests, even when an admin asks. Captains can't ask while the transfer window is closed.
  */
 export const kickPlayer = onCall(async (req) => {
   const uid = requireAuth(req);
@@ -204,21 +206,12 @@ export const kickPlayer = onCall(async (req) => {
   const seasonId = await currentSeasonId();
   if (!(await isOnTeam(seasonId, playerId, teamId))) throw new HttpsError('failed-precondition', 'That player is not on this team.');
   const pending = (await db.collection('requests').where('playerId', '==', playerId).where('status', '==', 'pending').get()).docs;
-  if (!admin) {
-    // Captains ask; an admin approves in Admin → Moves → Requests.
-    if (pending.some((d) => d.data()!.type === 'kick_player' && d.data()!.teamId === teamId)) throw new HttpsError('already-exists', 'A removal request for this player is already waiting for an admin.');
-    await db.collection('requests').add({
-      type: 'kick_player', teamId, playerId, fromTeamId: teamId, toTeamId: null, seasonId: seasonId || null,
-      status: 'pending', message: String(req.data?.message || '').slice(0, 200), requestedBy: uid, createdAt: FieldValue.serverTimestamp(),
-    });
-    return { requested: true };
-  }
-  await releasePlayer(seasonId, playerId, teamId, uid);
-  // Pending leave or removal requests for this player and team are moot now.
-  await Promise.all(pending.filter((d) => ['leave_team', 'kick_player'].includes(d.data()!.type) && d.data()!.teamId === teamId)
-    .map((d) => d.ref.update({ status: 'cancelled', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() })));
-  await auditNote(uid, `Removed ${playerId} from ${teamId}`, `players/${playerId}`);
-  return { ok: true };
+  if (pending.some((d) => d.data()!.type === 'kick_player' && d.data()!.teamId === teamId)) throw new HttpsError('already-exists', 'A removal request for this player is already waiting for an admin.');
+  await db.collection('requests').add({
+    type: 'kick_player', teamId, playerId, fromTeamId: teamId, toTeamId: null, seasonId: seasonId || null,
+    status: 'pending', message: String(req.data?.message || '').slice(0, 200), requestedBy: uid, createdAt: FieldValue.serverTimestamp(),
+  });
+  return { requested: true };
 });
 
 /** Admin mid-season transfer. Runs in the admin's browser. */
@@ -305,8 +298,14 @@ export const decideRequest = onCall(async (req) => {
       await ref.update({ status: 'cancelled', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
       throw new HttpsError('failed-precondition', 'That player is no longer on this team.');
     }
-    await releasePlayer(seasonId, r.playerId, r.teamId, uid);
+    const kick = r.type === 'kick_player';
+    await releasePlayer(seasonId, r.playerId, r.teamId, uid, kick);
     await ref.update({ status: 'accepted', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
+    // Any other leave/removal request for this player and team is moot now.
+    const others = await db.collection('requests').where('playerId', '==', r.playerId).where('status', '==', 'pending').get();
+    await Promise.all(others.docs.filter((d) => d.id !== requestId && ['leave_team', 'kick_player'].includes(d.data()!.type) && d.data()!.teamId === r.teamId)
+      .map((d) => d.ref.update({ status: 'cancelled', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() })));
+    if (kick) await auditNote(uid, `Removed ${r.playerId} from ${r.teamId} (requested by ${r.requestedBy})`, `players/${r.playerId}`);
     return { status: 'accepted' };
   }
   let moved: { fromTeamId: string | null; toTeamId: string | null };

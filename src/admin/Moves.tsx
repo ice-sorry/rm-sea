@@ -83,7 +83,7 @@ export function AdminRequests() {
           <tbody>{list.map((r) => (
             <tr key={r.id}>
               <td>{L.players[r.playerId]?.name}</td>
-              <td className="small">{r.type.replace('_', ' ')}{(r.type === 'join_season' || r.type === 'leave_season') && <><br /><span className="muted">{L.seasons.find((x) => x.id === r.seasonId)?.name || r.seasonId}</span></>}</td>
+              <td className="small">{r.type === 'kick_player' ? <b>removal</b> : r.type.replace('_', ' ')}{(r.type === 'join_season' || r.type === 'leave_season') && <><br /><span className="muted">{L.seasons.find((x) => x.id === r.seasonId)?.name || r.seasonId}</span></>}</td>
               <td>{r.type === 'leave_season' ? <TeamChip team={r.teamId ? L.teams[r.teamId] : null} /> : r.type === 'join_season' ? '—' : <TeamChip team={r.fromTeamId ? L.teams[r.fromTeamId] : null} />}</td>
               <td>{r.type === 'new_team' ? <span className="row"><i style={{ display: 'inline-block', width: 12, height: 12, background: r.color, borderRadius: 3 }} />{r.teamName}</span>
                 : r.type === 'join_season' ? <TeamChip team={r.teamId ? L.teams[r.teamId] : null} />

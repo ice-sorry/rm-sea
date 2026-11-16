@@ -234,8 +234,7 @@ function SquadCard({ teamId }: { teamId: string }) {
             ) : (
               <button className="btn sm danger" disabled={busy || closed} title={closed ? 'Transfers are closed' : undefined}
                 onClick={() => {
-                  const ask = L.isAdmin ? `Remove ${p.name} from ${team?.name}? They become a free agent.` : `Ask an admin to remove ${p.name} from ${team?.name}?`;
-                  if (window.confirm(ask)) run(() => call<unknown, { requested?: boolean }>('kickPlayer')({ teamId, playerId: p.id }), (r) => r?.requested ? 'Removal sent to the admins' : `${p.name} removed`);
+                  if (window.confirm(`Ask an admin to remove ${p.name} from ${team?.name}?`)) run(() => call('kickPlayer')({ teamId, playerId: p.id }), 'Removal sent to the admins');
                 }}>
                 <UserMinus size={14} aria-hidden />Remove
               </button>
@@ -243,7 +242,7 @@ function SquadCard({ teamId }: { teamId: string }) {
           </div>
         );
       })}
-      <p className="small muted">{closed ? "Transfers are closed, so players can't be removed right now." : L.isAdmin ? "Removed players become free agents. Captains can't be removed; change captains in Admin → League → Teams first." : "An admin approves each removal; the player then becomes a free agent. Captains can't be removed here."}</p>
+      <p className="small muted">{closed ? "Transfers are closed, so players can't be removed right now." : L.isAdmin ? "Every removal waits for approval in Admin → Moves → Requests; the player then becomes a free agent. Captains can't be removed; change captains in Admin → League → Teams first." : "An admin approves each removal; the player then becomes a free agent. Captains can't be removed here."}</p>
     </div>
   );
 }
