@@ -79,7 +79,7 @@ function usePlayerCols(): Col<PlayerStatRow>[] {
   const { players, teams } = useLeague();
   return [
     { key: 'name', label: 'Player', get: (r) => players[r.playerId]?.name || '', render: (r) => <span className="row"><Avatar src={players[r.playerId]?.avatarUrl} name={players[r.playerId]?.name} size="sm" />{players[r.playerId]?.name || 'Unknown'}<Flag country={players[r.playerId]?.country} /></span> },
-    { key: 'team', label: 'Team', get: (r) => (r.teamId ? teams[r.teamId]?.name : '') || '', render: (r) => <TeamChip team={r.teamId ? teams[r.teamId] : null} /> },
+    { key: 'team', label: 'Team', get: (r) => (r.teamId ? teams[r.teamId]?.name : '') || '', render: (r) => <TeamChip team={r.teamId ? teams[r.teamId] : null} link named /> },
     { key: 'gp', label: 'GP', get: (r) => r.gp, num: true },
     ...STAT_KEYS.map((k): Col<PlayerStatRow> => ({ key: k, label: STAT_LABELS[k], get: (r) => r[k] ?? 0, num: true })),
     { key: 'mvps', label: 'MVPs', get: (r) => r.mvps, num: true },

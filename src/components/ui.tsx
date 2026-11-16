@@ -25,8 +25,14 @@ export function SectionHeader({ eyebrow, title, accent, link, linkLabel = 'View 
 }
 
 /** Full-width band in the brand colour at the top of every main page. Render it before <main className="page">. */
-export function PageHeader({ eyebrow, title, accent, titleAfter, subtitle, right, children }: {
-  eyebrow?: ReactNode; title: string; accent?: string; titleAfter?: ReactNode; subtitle?: ReactNode; right?: ReactNode; children?: ReactNode;
+export function PageHeader({ eyebrow, title, accent, titleAfter, subtitle, meta, right, footer, children }: {
+  eyebrow?: ReactNode; title: string; accent?: string; titleAfter?: ReactNode; subtitle?: ReactNode;
+  /** Plain-text details stacked under the title (no display font). */
+  meta?: ReactNode;
+  right?: ReactNode;
+  /** A full-width row under the header content, starting at its left edge. */
+  footer?: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <header className="page-header">
@@ -36,8 +42,10 @@ export function PageHeader({ eyebrow, title, accent, titleAfter, subtitle, right
           {eyebrow && <div className="eyebrow">{eyebrow}</div>}
           <h1 className="title">{title}{accent && <> <em>{accent}</em></>}{titleAfter}</h1>
           {subtitle && <div className="page-header-sub">{subtitle}</div>}
+          {meta && <div className="page-header-meta">{meta}</div>}
         </div>
         {right}
+        {footer && <div className="page-header-footer">{footer}</div>}
       </div>
     </header>
   );
@@ -59,16 +67,37 @@ export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { key
   );
 }
 
+/** Black or white text, whichever reads better on this background colour (#rrggbb). */
+export function textOn(hex?: string | null): '#000' | '#fff' {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return '#fff';
+  const lin = (i: number) => { const c = parseInt(m[1].slice(i, i + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+  // Above ~0.18 relative luminance, black text has more contrast than white.
+  return L > 0.179 ? '#000' : '#fff';
+}
+
 export function Crest({ team, size = '' }: { team?: Team | null; size?: '' | 'sm' | 'lg' }) {
   if (!team) return <span className={`crest ${size}`} style={{ background: 'var(--surface-2)' }}>?</span>;
   // Discord attachment links expire after ~24 h; imageSrc() routes them through the Worker, which re-signs them.
   if (team.crestUrl) return <img className={`crest logo ${size}`} src={imageSrc(team.crestUrl)} alt="" loading="lazy" />;
-  return <span className={`crest ${size}`} style={{ background: team.color || 'var(--accent)' }}>{(team.shortName || initials(team.name)).slice(0, 3)}</span>;
+  const text = (team.shortName || initials(team.name)).slice(0, 4);
+  // Four letters get a slightly smaller font so they still fit the badge.
+  return <span className={`crest ${size}${text.length > 3 ? ' long' : ''}`} style={{ background: team.color || 'var(--accent)', color: textOn(team.color) }}>{text}</span>;
 }
 
-export function TeamChip({ team }: { team?: Team | null }) {
+/** Team crest/logo. `named` adds the abbreviation in a team-coloured pill; `link` makes it open the team page. */
+export function TeamChip({ team, link, named }: { team?: Team | null; link?: boolean; named?: boolean }) {
   if (!team) return <span className="team-chip muted">Free agent</span>;
-  return <span className="team-chip" style={{ boxShadow: `inset 3px 0 0 ${team.color}` }}><Crest team={team} size="sm" />{team.shortName || team.name}</span>;
+  // link: the chip opens the team page (and doesn't trigger a clickable row underneath).
+  if (link) return <a className="team-chip-link" href={`#team/${encodeURIComponent(team.id)}`} onClick={(e) => e.stopPropagation()}><TeamChip team={team} named={named} /></a>;
+  // Logo (or crest badge) sits outside; only the name pill takes the team colour, with black or white text by brightness.
+  return (
+    <span className="team-chip-wrap">
+      <Crest team={team} size="sm" />
+      {named && <span className="team-chip" style={team.color ? { background: team.color, color: textOn(team.color) } : undefined}>{team.shortName || team.name}</span>}
+    </span>
+  );
 }
 
 export function FormPills({ form }: { form: string[] }) {

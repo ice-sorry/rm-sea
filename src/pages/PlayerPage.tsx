@@ -3,7 +3,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useLeague } from '../lib/league';
 import { useDoc } from '../lib/hooks';
-import { Avatar, TeamChip, StatCard, Empty, PageHeader, Flag } from '../components/ui';
+import { Avatar, Crest, TeamChip, StatCard, Empty, PageHeader, Flag } from '../components/ui';
 import { ProfileEditor, MyRequests, WrappedViewer } from '../components/player';
 import { findCountry } from '../lib/countries';
 import { useModal, playerHref, teamHref } from '../modals/ModalContext';
@@ -57,8 +57,15 @@ export default function PlayerPage({ id }: { id: string }) {
   return (
     <>
       <PageHeader
-        eyebrow={<>{POSITION_LABELS[p.position]}{team && <> · <a href={teamHref(team.id)}>{team.name}</a></>}{p.country && <> · {findCountry(p.country)?.name || p.country}</>}</>}
-        title={first} accent={rest.join(' ') || undefined} titleAfter={<Flag country={p.country} size="lg" />}
+        eyebrow="Player"
+        title={first} accent={rest.join(' ') || undefined}
+        meta={<>
+          <span className={`role-badge role-${p.position}`}>{POSITION_LABELS[p.position]}</span>
+          {findCountry(p.country) && <span className="row" style={{ gap: 8 }}><Flag country={p.country} />{findCountry(p.country)!.name}</span>}
+          <a className="player-team" href={team ? teamHref(team.id) : '#teams'}>
+            {team ? <><span className="player-team-label">Plays for</span><Crest team={team} size="sm" /><span>{team.name}</span></> : <span className="muted">Free agent</span>}
+          </a>
+        </>}
         right={<span className="row">
           <button className="btn" onClick={() => open({ kind: 'compare', ids: [id] })}><Scale size={15} aria-hidden />Compare</button>
         </span>}>

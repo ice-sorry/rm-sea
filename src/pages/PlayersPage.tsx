@@ -48,7 +48,7 @@ export default function PlayersPage() {
       ),
     },
     { key: 'position', label: 'Position', get: (r) => POSITION_LABELS[r.player.position] || '', render: (r) => POSITION_LABELS[r.player.position] || '—' },
-    { key: 'team', label: 'Team', get: (r) => (r.player.currentTeamId ? L.teams[r.player.currentTeamId]?.name : '') || '', render: (r) => <TeamChip team={r.player.currentTeamId ? L.teams[r.player.currentTeamId] : null} /> },
+    { key: 'team', label: 'Team', get: (r) => (r.player.currentTeamId ? L.teams[r.player.currentTeamId]?.name : '') || '', render: (r) => <TeamChip team={r.player.currentTeamId ? L.teams[r.player.currentTeamId] : null} link named /> },
     {
       key: 'country', label: 'Country', get: (r) => findCountry(r.player.country)?.name || '',
       render: (r) => findCountry(r.player.country) ? <span className="row" style={{ gap: 0 }}><Flag country={r.player.country} /><span style={{ marginLeft: 8 }}>{findCountry(r.player.country)!.name}</span></span> : <span className="muted">—</span>,

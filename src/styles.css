@@ -72,6 +72,23 @@ img { max-width: 100%; }
 /* Team page: push the name/abbreviation block away from the crest. */
 .page-header-inner > .crest + .grow { margin-left: var(--s3); }
 @media (min-width: 900px) { .page-header-inner > .crest + .grow { margin-left: var(--s5); } }
+.page-header-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: var(--s2); color: rgba(255,255,255,.85); font-size: 15px; }
+.page-header-footer { flex-basis: 100%; margin-top: var(--s3); }
+.player-team { display: inline-flex; align-items: center; gap: var(--s3); font-family: var(--font-display); font-weight: 800; font-size: 24px; text-transform: uppercase; color: #fff; }
+.player-team:hover { text-decoration: none; opacity: .9; }
+.player-team { gap: var(--s2); font-size: 20px; margin-top: var(--s2); }
+.player-team .crest { width: 24px; height: 24px; }
+.player-team-label { font-family: var(--font-body, inherit); font-weight: 500; font-size: 15px; text-transform: none; color: rgba(255,255,255,.75); }
+/* Position badges: outlined in a light colour per role, text in the same colour. */
+.role-badge { --role: #fff; display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 13px; font-weight: 700; letter-spacing: .3px; background-color: color-mix(in srgb, var(--role) 30%, transparent); border: 2px solid var(--role); color: #fff ; }
+.role-ST { --role: #ff9a9a; }
+.role-DF { --role: #9ccfff; }
+.role-GK { --role: #a6f0b0; }
+.role-MF { --role: #fff09a; }
+.role-WF { --role: #ffc58a; }
+.role-UNSURE { --role: #fff; }
+.team-chip-link { display: inline-flex; }
+.team-chip-link:hover { text-decoration: none; filter: brightness(1.1); }
 .page-header-sub { margin-top: var(--s2); font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: 3px; color: rgba(255,255,255,.75); }
 .page.home-page { padding-bottom: 96px; }
 
@@ -199,8 +216,16 @@ td.zone-cell span { display: block; width: 4px; height: 38px; }
 .crest.sm { width: 20px; height: 20px; font-size: 9px; border-radius: 4px; }
 /* A team with its own logo shows just the image: no coloured badge, no rounded tile. */
 img.crest.logo { background: none; border-radius: 0; object-fit: contain; }
+/* Four-letter abbreviations: shrink the text about 20% so it fits each badge size. */
+.crest.long { font-size: 10px; letter-spacing: -0.3px; }
+.crest.lg.long { font-size: 16px; }
+.crest.sm.long { font-size: 7px; letter-spacing: -0.2px; }
+.team-row .crest.lg.long { font-size: 19px; }
+@media (min-width: 900px) { .team-row .crest.lg.long { font-size: 26px; } }
 .team-cell { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
-.team-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 2px; border-radius: 999px; background: var(--surface-2); font-size: 12px; font-weight: 600; }
+/* A text badge inside a team-coloured chip gets a faint ring so it doesn't melt into the chip. */
+.team-chip-wrap { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+.team-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); font-size: 12px; font-weight: 600; }
 .form { display: inline-flex; gap: 3px; }
 .pill { width: 20px; height: 20px; border-radius: 4px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 800; color: #0c0c0c; }
 .pill.W { background: var(--win); } .pill.D { background: var(--draw); } .pill.L { background: var(--loss); color: #fff; }
