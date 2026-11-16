@@ -1,5 +1,5 @@
 import { onCall, HttpsError, invoke, CallableRequest } from './runtime';
-import { db, FieldValue, requireAuth, requireAdmin, roleOf, currentSeasonId, getSettings, discordAllowed, DISCORD_BOT_TOKEN, auditNote } from './admin';
+import { db, FieldValue, requireAuth, requireAdmin, roleOf, currentSeasonId, getSettings, discordAllowed, DISCORD_BOT_TOKEN, DISCORD_GUILD_ID, auditNote } from './admin';
 import { avatarUrl, discordApi } from './discord';
 import { POSITIONS, Position, TRANSFER_LOG_STATUSES } from './shared/league';
 
@@ -25,6 +25,27 @@ export const claimPlayer = onCall(async (req) => {
 });
 
 /**
+ * Whether this Discord account may create a player: it must hold one of the player role IDs (e.g. Verified) set in
+ * Admin → Settings → Admins (settings/admins.playerRoleIds). No role IDs set means anyone may register.
+ * Roles are re-read through the bot so a freshly verified member doesn't have to sign in again.
+ */
+async function hasPlayerRole(uid: string, discordId: string): Promise<boolean> {
+  const { playerRoleIds = [] } = await getSettings<{ playerRoleIds?: string[] }>('admins');
+  if (!playerRoleIds.length) return true;
+  const userRef = db.doc(`users/${uid}`);
+  let roles: string[] = (await userRef.get()).data()?.guildRoleIds || [];
+  try {
+    const member = await discordApi<{ roles?: string[] }>(DISCORD_BOT_TOKEN.value(), 'GET', `/guilds/${DISCORD_GUILD_ID.value()}/members/${discordId}`);
+    roles = member.roles || [];
+    await userRef.set({ guildRoleIds: roles }, { merge: true });
+  } catch (e) {
+    // 404: not in the server (any more). Other failures (bot not set up, outage): fall back to the roles from sign-in.
+    if (/: 404 /.test(String(e))) roles = [];
+  }
+  return roles.some((r) => playerRoleIds.includes(r));
+}
+
+/**
  * First sign-in: give the Discord account its player. Every league player signs in to register for teams, so the
  * player is tied to the Discord account. A record an admin already linked to this Discord ID is adopted; otherwise a
  * new free agent is created.
@@ -35,6 +56,8 @@ export const setupPlayer = onCall(async (req) => {
   if (!discordId) throw new HttpsError('failed-precondition', 'Sign in with Discord first.');
   const { name: rawName, position: rawPos, country: rawCountry } = (req.data || {}) as { name?: string; position?: Position; country?: string };
   const userRef = db.doc(`users/${caller}`);
+  // Only checked when creating a new player: records an admin already linked to this account can still be adopted.
+  const eligible = isAdminReq(req) || await hasPlayerRole(caller, discordId);
   return db.runTransaction(async (tx) => {
     const user = await tx.get(userRef);
     const u = user.data() || {};
@@ -51,6 +74,7 @@ export const setupPlayer = onCall(async (req) => {
       return { playerId: pre.id, created: false };
     }
 
+    if (!eligible) throw new HttpsError('permission-denied', 'Only members with the Verified role in the league Discord can register as a player. Get verified in the server, then try again.');
     const name = String(rawName || '').trim().slice(0, 32);
     if (name.length < 2) throw new HttpsError('invalid-argument', 'Name is too short.');
     const position: Position = POSITIONS.includes(rawPos as Position) ? (rawPos as Position) : 'UNSURE';

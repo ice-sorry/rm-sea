@@ -289,7 +289,7 @@ function Merge() {
 function Admins() {
   const L = useLeague();
   const { run, busy } = useAction();
-  const [f, setF] = useSettingsForm('settings/admins', { adminUids: [] as string[], ownerUids: [] as string[], adminRoleIds: ['1562781903604424794', '1563169917384134827'] as string[] });
+  const [f, setF] = useSettingsForm('settings/admins', { adminUids: [] as string[], ownerUids: [] as string[], adminRoleIds: ['1562781903604424794', '1563169917384134827'] as string[], playerRoleIds: [] as string[] });
   const [uid, setUid] = useState('');
   const lines = (v: string[]) => v.join('\n');
   const parse = (s: string) => s.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
@@ -303,6 +303,9 @@ function Admins() {
           <Field label="Admin UIDs"><textarea className="textarea" value={lines(f.adminUids)} onChange={(e) => setF({ ...f, adminUids: parse(e.target.value) })} /></Field>
           <Field label="Admin Discord role IDs"><textarea className="textarea" value={lines(f.adminRoleIds)} onChange={(e) => setF({ ...f, adminRoleIds: parse(e.target.value) })} /></Field>
         </div>
+        <Field label="Player Discord role IDs (e.g. Verified)"><textarea className="textarea" value={lines(f.playerRoleIds || [])} onChange={(e) => setF({ ...f, playerRoleIds: parse(e.target.value) })} /></Field>
+        <p className="small muted" style={{ margin: 0 }}>Only Discord members holding one of these roles can create a player. Leave empty to let anyone register.
+          Players an admin already linked to an account can still be claimed.</p>
         <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/admins'), f), 'Admins saved — refresh their claims below')}>Save</button>
       </div>
       <div className="card row">
