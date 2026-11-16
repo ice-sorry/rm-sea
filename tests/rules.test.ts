@@ -125,6 +125,15 @@ describe('self-service', () => {
     await assertFails(updateDoc(doc(as(USER), 'cups/c1/matches/m1'), { screenshotUrls: ['https://x/y.png'] }));
     await assertFails(updateDoc(doc(as(CAPTAIN), 'seasons/s1/matches/m1'), { screenshotUrls: [], status: 'played' }));
   });
+  it('captains attach one screenshot per game', async () => {
+    await assertSucceeds(updateDoc(doc(as(CAPTAIN), 'seasons/s1/matches/m1'), { 'gameScreenshots.1': 'https://x/g1.png' }));
+    await assertSucceeds(updateDoc(doc(as(CAPTAIN), 'seasons/s1/matches/m1'), { 'gameScreenshots.2': 'https://x/g2.png' }));
+    await assertSucceeds(updateDoc(doc(as(CAPTAIN), 'cups/c1/matches/m1'), { 'gameScreenshots.1': 'https://x/g1.png' }));
+    await assertFails(updateDoc(doc(as(USER), 'seasons/s1/matches/m1'), { 'gameScreenshots.1': 'https://x/g1.png' }));
+    await assertFails(updateDoc(doc(as(ROSTERED), 'seasons/s1/matches/m1'), { 'gameScreenshots.1': 'https://x/g1.png' }));
+    await assertFails(updateDoc(doc(as(CAPTAIN), 'seasons/s1/matches/m1'), { 'gameScreenshots.1': 'https://x/g1.png', status: 'played' }));
+    await assertFails(updateDoc(doc(as(CAPTAIN), 'seasons/s2/matches/m1'), { 'gameScreenshots.1': 'https://x/g1.png' }));
+  });
   it('requests must be pending, own, and for own player', async () => {
     await assertSucceeds(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'transfer', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'pending', toTeamId: 't2' }));
     await assertFails(addDoc(collection(as(CAPTAIN), 'requests'), { type: 'transfer', playerId: 'p-cap', requestedBy: CAPTAIN, status: 'accepted', toTeamId: 't2' }));

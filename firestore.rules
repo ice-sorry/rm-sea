@@ -14,10 +14,12 @@ service cloud.firestore {
       let g = /databases/$(db)/documents/settings/general;
       return !exists(g) || get(g).data.get('transfersBlocked', false) != true;
     }
-    // Captains of either team set the match's single screenshot link (a new link replaces the old one).
+    // Captains of either team set screenshot links: one per game (gameScreenshots, keyed by game number), or the
+    // older single series screenshot (screenshotUrls). A new link replaces the old one.
     function captainScreenshot() {
-      return signedIn() && changed().hasOnly(['screenshotUrls'])
-        && request.resource.data.screenshotUrls is list && request.resource.data.screenshotUrls.size() <= 1
+      return signedIn() && changed().hasOnly(['screenshotUrls', 'gameScreenshots'])
+        && request.resource.data.get('screenshotUrls', []) is list && request.resource.data.get('screenshotUrls', []).size() <= 1
+        && request.resource.data.get('gameScreenshots', {}) is map && request.resource.data.get('gameScreenshots', {}).size() <= 9
         && (myPlayerId() in captains(resource.data.homeTeamId) || myPlayerId() in captains(resource.data.awayTeamId));
     }
 

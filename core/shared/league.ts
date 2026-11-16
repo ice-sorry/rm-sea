@@ -38,7 +38,10 @@ export interface Match {
   games: Game[];
   seriesHome: number; seriesAway: number; goalsHome: number; goalsAway: number;
   winnerTeamId: string | null; mvpPlayerId: string | null;
+  /** Legacy: one screenshot for the whole series. New screenshots go in gameScreenshots. */
   screenshotUrls?: string[];
+  /** One screenshot link per game, keyed by game number ("1", "2", ...). */
+  gameScreenshots?: Record<string, string>;
   verification?: 'ok' | 'check';
   discordThreadId?: string | null; bracketSlot?: string | null;
   createdBy?: string; updatedBy?: string; createdAt?: TS; updatedAt?: TS;

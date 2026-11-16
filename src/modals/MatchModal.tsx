@@ -10,7 +10,7 @@ import { fmtDateTime } from '../lib/format';
 import { imageSrc, normalizeImageLink } from '../lib/images';
 import type { MatchDoc, Team } from '../lib/types';
 import type { Game } from '../../core/shared/league';
-import { STAT_KEYS, STAT_LABELS } from '../../core/shared/league';
+import { DEFAULT_SEASON, STAT_KEYS, STAT_LABELS } from '../../core/shared/league';
 import { Camera, ChevronDown, ChevronRight, Clock, Goal, Star, Wrench } from 'lucide-react';
 
 // The series MVP line is switched off for now; per-game MVPs still show in the tables.
@@ -26,8 +26,6 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
   const { open } = useModal();
   const path = cupId ? `cups/${cupId}/matches/${id}` : `seasons/${seasonId || L.seasonId}/matches/${id}`;
   const { data: m, loading } = useDoc<MatchDoc>(path);
-  const [shot, setShot] = useState('');
-  const [showShot, setShowShot] = useState(false);
   const { run, busy } = useAction();
   const canKickoff = useCanSetKickoff(m ? [m.homeTeamId, m.awayTeamId] : []);
   // The whole popup takes the winning team's colour. The modal shell lives outside this component, so set it there.
@@ -43,15 +41,20 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
   if (loading) return <Skeleton rows={6} />;
   if (!m) return <Empty>Match not found.</Empty>;
   const h = L.teams[m.homeTeamId], a = L.teams[m.awayTeamId];
-  // Captains of either team (or admins) set the one screenshot per match; a new link replaces the old one.
+  // Captains of either team (or admins) set one screenshot per game; a new link replaces that game's old one.
   const canUpload = canKickoff;
   const name = (pid: string) => L.players[pid]?.name || 'Unknown';
-  const screenshot = m.screenshotUrls?.length ? m.screenshotUrls[m.screenshotUrls.length - 1] : null;
+  // Older matches kept a single screenshot for the whole series; it still shows below the games.
+  const seriesShot = m.screenshotUrls?.length ? m.screenshotUrls[m.screenshotUrls.length - 1] : null;
+  const shots = m.gameScreenshots || {};
   // Free plan: no Cloud Storage, so screenshots are links (e.g. right-click → Copy link on a Discord attachment).
-  const addShot = () => run(async () => {
-    await updateDoc(doc(db, path), { screenshotUrls: [normalizeImageLink(shot)] });
-    setShot('');
-  }, screenshot ? 'Screenshot replaced' : 'Screenshot added');
+  const saveShot = (n: number, link: string) => run(
+    () => updateDoc(doc(db, path), { [`gameScreenshots.${n}`]: normalizeImageLink(link) }),
+    shots[n] ? `Game ${n} screenshot replaced` : `Game ${n} screenshot added`,
+  );
+  // Before a result exists there are no games yet: offer a slot for every game the series format allows.
+  const fmt = (cupId ? null : L.seasons.find((x) => x.id === (seasonId || L.seasonId))?.seriesFormat) || DEFAULT_SEASON.seriesFormat;
+  const slots = m.games?.length ? [] : Array.from({ length: Math.max(1, fmt.maxGames) }, (_, i) => i + 1);
   return (
     <div className="stack match-view" ref={root}>
       <div className="eyebrow center">{m.stage === 'league' ? `Round ${m.round} · Matchweek ${m.matchweek}` : m.stage.toUpperCase()} · {m.status === 'played' ? fmtDateTime(m.matchDate) : fmtDateTime(m.kickoffAt)}</div>
@@ -77,7 +80,7 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
               <div className="game-score-col">
                 <b className="num game-score"><Score home={g.homeGoals} away={g.awayGoals} /></b>
                 {gameWinner
-                  ? <span className="game-result" style={{ '--team': L.teams[gameWinner]?.color || 'var(--accent)' } as React.CSSProperties}>{L.teams[gameWinner]?.name || 'Winner'} won</span>
+                  ? <span className="game-result" style={{ '--team': L.teams[gameWinner]?.color || 'var(--accent)' } as React.CSSProperties}>{L.teams[gameWinner]?.shortName || 'Winner'} won</span>
                   : <span className="game-result draw">Draw</span>}
               </div>
               <span />
@@ -92,6 +95,7 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
                 <TeamStatsTable game={g} team={a} teamId={m.awayTeamId} away name={name} />
               </div>
             )}
+            <GameShot n={g.n} url={shots[g.n]} canUpload={canUpload} busy={busy} onSave={saveShot} />
           </div>
         );
       })}</div>}
@@ -103,34 +107,58 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
           <span className="small muted">Times are in your local timezone.</span>
         </div>
       )}
-      {screenshot && (
-        <div className="stack" style={{ gap: 'var(--s2)' }}>
-          <button className="btn ghost shot-toggle" aria-expanded={showShot} onClick={() => setShowShot((v) => !v)}>
-            {showShot ? <ChevronDown size={16} aria-hidden /> : <ChevronRight size={16} aria-hidden />}{showShot ? 'Hide screenshot' : 'Show screenshot'}
-          </button>
-          {showShot && <a href={imageSrc(screenshot)} target="_blank" rel="noreferrer" className="center"><img className="match-shot" src={imageSrc(screenshot)} alt="Match screenshot" loading="lazy" /></a>}
+      {slots.length > 0 && (canUpload || slots.some((n) => shots[n])) && (
+        <div className="card stack match-game">
+          <div className="eyebrow" style={{ margin: 0 }}><Camera size={12} aria-hidden /> Game screenshots</div>
+          {slots.map((n) => <GameShot key={n} n={n} url={shots[n]} canUpload={canUpload} busy={busy} onSave={saveShot} labelled />)}
         </div>
       )}
+      {seriesShot && <ShotToggle url={seriesShot} label="series screenshot" />}
       {canUpload && (
-        <div className="card stack" style={{ padding: 12 }}>
-          <div className="eyebrow" style={{ margin: 0 }}><Camera size={12} aria-hidden /> Captain: match screenshot</div>
-          <div className="row wrap">
-            <input className="input" style={{ maxWidth: 360 }} placeholder="https://cdn.discordapp.com/attachments/…" value={shot} onChange={(e) => setShot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && shot.trim() && addShot()} />
-            <button className="btn sm" disabled={busy || !shot.trim()} onClick={addShot}><Camera size={15} aria-hidden />{screenshot ? 'Replace screenshot' : 'Add screenshot'}</button>
-          </div>
-          <div className="small muted">
-            <b>How to add the screenshot</b>
-            <ol style={{ margin: '4px 0 0', paddingLeft: 20 }}>
-              <li>Find this match's post in <b>#fixture-hub</b> on Discord.</li>
-              <li>Post the end-of-series screenshot there.</li>
-              <li>Right-click the image → <b>Copy Image Link</b>.</li>
-              <li>Paste the link into the box above and press <b>{screenshot ? 'Replace screenshot' : 'Add screenshot'}</b>.</li>
-            </ol>
-            One screenshot per match; adding a new one replaces the old.
-          </div>
+        <div className="small muted card" style={{ padding: 12 }}>
+          <b>How to add game screenshots</b>
+          <ol style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+            <li>Find this match's post in <b>#fixture-hub</b> on Discord.</li>
+            <li>Post the end-of-game screenshot for each game there.</li>
+            <li>Right-click an image → <b>Copy Image Link</b>.</li>
+            <li>Paste it into that game's box on this screen and press <b>Add</b>.</li>
+          </ol>
+          One screenshot per game; adding a new one replaces that game's old one.
         </div>
       )}
       {L.isAdmin && <div className="row" style={{ justifyContent: 'center' }}><a className="btn sm" href={`#admin/result?${cupId ? `cup=${cupId}&` : ''}match=${id}`}><Wrench size={15} aria-hidden />Edit result</a></div>}
+    </div>
+  );
+}
+
+/** Arrow toggle that reveals a screenshot (hidden by default). */
+function ShotToggle({ url, label }: { url: string; label: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="stack" style={{ gap: 'var(--s2)' }}>
+      <button className="btn ghost shot-toggle" aria-expanded={show} onClick={() => setShow((v) => !v)}>
+        {show ? <ChevronDown size={16} aria-hidden /> : <ChevronRight size={16} aria-hidden />}{show ? `Hide ${label}` : `Show ${label}`}
+      </button>
+      {show && <a href={imageSrc(url)} target="_blank" rel="noreferrer" className="center"><img className="match-shot" src={imageSrc(url)} alt={label} loading="lazy" /></a>}
+    </div>
+  );
+}
+
+/** One game's screenshot: the show/hide toggle, plus a link box for captains and admins. */
+function GameShot({ n, url, canUpload, busy, onSave, labelled }: { n: number; url?: string; canUpload: boolean; busy: boolean; onSave: (n: number, link: string) => Promise<unknown>; labelled?: boolean }) {
+  const [link, setLink] = useState('');
+  if (!url && !canUpload) return null;
+  const save = () => { if (link.trim()) void onSave(n, link).then(() => setLink('')); };
+  return (
+    <div className="game-shot">
+      {labelled && <b className="small">Game {n}</b>}
+      {url ? <ShotToggle url={url} label={`game ${n} screenshot`} /> : labelled ? <span className="small muted">No screenshot yet</span> : null}
+      {canUpload && (
+        <div className="row wrap" style={{ justifyContent: 'center' }}>
+          <input className="input" style={{ maxWidth: 360 }} placeholder={`Game ${n} screenshot link (https://cdn.discordapp.com/…)`} value={link} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
+          <button className="btn sm" disabled={busy || !link.trim()} onClick={save}><Camera size={15} aria-hidden />{url ? 'Replace' : 'Add'}</button>
+        </div>
+      )}
     </div>
   );
 }
