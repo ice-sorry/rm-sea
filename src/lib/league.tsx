@@ -101,11 +101,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [authUser, meReady, me]);
 
-  const value = useMemo<LeagueState>(() => {
+  // Its own memo so L.seasons only changes when a season changes. Pages fetch per-season data (awards, stats)
+  // keyed on it, and rebuilding it with every player or match update made them re-read everything.
+  const seasons = useMemo(() => [...seasonDocs].map((s) => ({ ...DEFAULT_SEASON, ...s }) as Season)
     // The retired Finals Shield's "second chance" zone may still be stored on older seasons; hide it.
-    const seasons = [...seasonDocs].map((s) => ({ ...DEFAULT_SEASON, ...s }) as Season)
-      .map((s) => ({ ...s, zones: (s.zones || []).filter((z) => z.kind !== 'secondChance') }))
-      .sort((a, b) => (b.number || 0) - (a.number || 0));
+    .map((s) => ({ ...s, zones: (s.zones || []).filter((z) => z.kind !== 'secondChance') }))
+    .sort((a, b) => (b.number || 0) - (a.number || 0)), [seasonDocs]);
+
+  const value = useMemo<LeagueState>(() => {
     const teamList = teamDocs.filter((t) => !t.mergedInto).sort((a, b) => a.name.localeCompare(b.name));
     const playerList = playerDocs.filter((p) => !p.mergedInto).sort((a, b) => a.name.localeCompare(b.name));
     const players = Object.fromEntries(playerDocs.map((p) => [p.id, p]));
@@ -127,7 +130,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       isOwner: claims.role === 'owner',
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [general, gLoading, tLoading, seasonDocs, seasonId, teamDocs, playerDocs, matches, entryDocs, rosterDocs, standings, sLoading, playerStats, teamStats, leaders, authUser, authReady, claims, me, meReady, meError]);
+  }, [general, gLoading, tLoading, seasons, seasonId, teamDocs, playerDocs, matches, entryDocs, rosterDocs, standings, sLoading, playerStats, teamStats, leaders, authUser, authReady, claims, me, meReady, meError]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
