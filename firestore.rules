@@ -100,7 +100,8 @@ service cloud.firestore {
     match /cups/{c}/matches/{m} { allow update: if captainScreenshot(); }
     match /content/{d}         { allow read: if true; allow write: if isAdmin(); }
     match /settings/{d} {
-      allow read: if d != 'admins';
+      // "|| isAdmin()" lets admins list the whole collection (backups); settings/admins stays admin-only.
+      allow read: if d != 'admins' || isAdmin();
       allow write: if isAdmin() && d != 'admins';
     }
     match /settings/admins     { allow read: if isAdmin(); allow write: if isOwner(); }

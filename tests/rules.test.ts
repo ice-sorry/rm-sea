@@ -4,7 +4,7 @@
 import { readFileSync } from 'fs';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment, RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 
 let env: RulesTestEnvironment;
 const USER = 'discord:200', ADMIN = 'discord:300', OWNER = 'discord:400', CAPTAIN = 'discord:500', ROSTERED = 'discord:700';
@@ -99,6 +99,10 @@ describe('admins', () => {
   });
   it('cannot edit results in a locked season', async () => {
     await assertFails(updateDoc(doc(as(ADMIN, 'admin'), 'seasons/s2/matches/m1'), { status: 'void' }));
+  });
+  it('admins can list all settings (backups), others cannot', async () => {
+    await assertSucceeds(getDocs(collection(as(ADMIN, 'admin'), 'settings')));
+    await assertFails(getDocs(collection(as(USER), 'settings')));
   });
   it('only owners edit settings/admins', async () => {
     await assertFails(setDoc(doc(as(ADMIN, 'admin'), 'settings/admins'), { adminUids: [] }));
