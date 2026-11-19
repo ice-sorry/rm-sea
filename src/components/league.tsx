@@ -14,7 +14,7 @@ export function LeagueTable({ rows, compact, zones, divisionName }: { rows: Stan
   const { teams } = useLeague();
   const { open } = useModal();
   if (!rows) return <Skeleton rows={8} />;
-  if (!rows.length) return <Empty>No teams entered yet.</Empty>;
+  if (!rows.length) return <Empty>There are no teams in the league yet.</Empty>;
   return (
     <div className="table-wrap">
       {divisionName && <div className="eyebrow" style={{ padding: '8px 8px 0' }}>{divisionName}</div>}

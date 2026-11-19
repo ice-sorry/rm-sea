@@ -45,10 +45,10 @@ function DivisionTables({ rows }: { rows: StandingRow[] | null }) {
 }
 
 function TableTab() {
-  const { standings, season } = useLeague();
+  const { standingsRows, season } = useLeague();
   return (
     <ExportCard title={`${season?.name || ''} Standings`} filename={`srl-${season?.id || 'table'}-standings`}>
-      <div className="card flush"><DivisionTables rows={standings?.rows ?? (season ? null : [])} /></div>
+      <div className="card flush"><DivisionTables rows={standingsRows} /></div>
       <ZoneLegend zones={season?.zones || []} />
     </ExportCard>
   );

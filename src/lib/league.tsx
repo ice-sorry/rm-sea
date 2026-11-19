@@ -24,6 +24,8 @@ interface LeagueState {
   entries: Entry[];
   rosters: Record<string, string[]>;
   standings: StandingsDoc | null;
+  /** Standings rows for the selected season: null while loading, [] when the league has no teams yet. */
+  standingsRows: StandingsDoc['rows'] | null;
   playerStats: PlayerStatsDoc | null;
   teamStats: TeamStatsDoc | null;
   leaders: LeadersDoc | null;
@@ -74,7 +76,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const { data: matches } = useCol<MatchDoc>(seasonId ? `seasons/${seasonId}/matches` : null);
   const { data: entryDocs } = useCol<Entry & { id: string }>(seasonId ? `seasons/${seasonId}/entries` : null);
   const { data: rosterDocs } = useCol<{ playerIds: string[] }>(seasonId ? `seasons/${seasonId}/rosters` : null);
-  const { data: standings } = useDoc<StandingsDoc>(seasonId ? `seasons/${seasonId}/derived/standings` : null);
+  const { data: standings, loading: sLoading } = useDoc<StandingsDoc>(seasonId ? `seasons/${seasonId}/derived/standings` : null);
   const { data: playerStats } = useDoc<PlayerStatsDoc>(seasonId ? `seasons/${seasonId}/derived/playerStats` : null);
   const { data: teamStats } = useDoc<TeamStatsDoc>(seasonId ? `seasons/${seasonId}/derived/teamStats` : null);
   const { data: leaders } = useDoc<LeadersDoc>(seasonId ? `seasons/${seasonId}/derived/leaders` : null);
@@ -118,13 +120,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       entries: entryDocs.map((e) => ({ ...e, teamId: e.id })),
       rosters: Object.fromEntries(rosterDocs.map((r) => [r.id, r.playerIds || []])),
       standings, playerStats, teamStats, leaders,
+      standingsRows: standings?.rows ?? (seasonId && sLoading ? null : []),
       authUser, authReady, claims, me, meReady, meError,
       myPlayer: me?.playerId ? players[me.playerId] || null : null,
       isAdmin: claims.role === 'admin' || claims.role === 'owner',
       isOwner: claims.role === 'owner',
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [general, gLoading, tLoading, seasonDocs, seasonId, teamDocs, playerDocs, matches, entryDocs, rosterDocs, standings, playerStats, teamStats, leaders, authUser, authReady, claims, me, meReady, meError]);
+  }, [general, gLoading, tLoading, seasonDocs, seasonId, teamDocs, playerDocs, matches, entryDocs, rosterDocs, standings, sLoading, playerStats, teamStats, leaders, authUser, authReady, claims, me, meReady, meError]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

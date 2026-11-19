@@ -207,7 +207,7 @@ function Standings() {
   return (
     <section>
       <SectionHeader eyebrow="The race" title="League" accent="standings" link="#table" linkLabel="Full table →" />
-      <div className="card flush"><LeagueTable compact rows={L.standings?.rows ?? (L.season ? null : [])} zones={L.season?.zones || []} /></div>
+      <div className="card flush"><LeagueTable compact rows={L.standingsRows} zones={L.season?.zones || []} /></div>
     </section>
   );
 }
@@ -216,7 +216,7 @@ function Standings() {
 function PinnedCelebration({ seasonId }: { seasonId: string }) {
   const L = useLeague();
   const { open } = useModal();
-  const { data: standings } = useDoc<StandingsDoc>(`seasons/${seasonId}/derived/standings`);
+  const { data: standings, loading: standingsLoading } = useDoc<StandingsDoc>(`seasons/${seasonId}/derived/standings`);
   const { data: awards } = useCol<Award>(`seasons/${seasonId}/awards`);
   const season = L.seasons.find((s) => s.id === seasonId);
   const championAward = awards.find((a) => a.type === 'champion');
@@ -248,7 +248,7 @@ function PinnedCelebration({ seasonId }: { seasonId: string }) {
       </section>
       <section>
         <SectionHeader eyebrow="Final standings" title="The final" accent="table" />
-        <div className="card flush"><LeagueTable rows={standings?.rows || null} zones={season?.zones || []} /></div>
+        <div className="card flush"><LeagueTable rows={standings?.rows ?? (standingsLoading ? null : [])} zones={season?.zones || []} /></div>
       </section>
     </main>
     </>
