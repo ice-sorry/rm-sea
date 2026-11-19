@@ -1,5 +1,5 @@
 // Brand + integration constants (spec §1, §5). Override via .env.local.
-import { CalendarDays, ChartLine, House, ListOrdered, Medal, Shield, Trophy, User, type LucideIcon } from 'lucide-react';
+import { CalendarDays, ChartLine, House, ListOrdered, Medal, ScrollText, Shield, Trophy, User, type LucideIcon } from 'lucide-react';
 const env = import.meta.env;
 
 export const BRAND = {
@@ -26,6 +26,7 @@ export const NAV: NavItem[] = [
   { route: 'stats', label: 'Statistics', icon: ChartLine },
   { route: 'cups', label: 'Cups', icon: Trophy },
   { route: 'awards', label: 'Awards', icon: Medal },
+  { route: 'rules', label: 'Rules', icon: ScrollText },
 ];
 
 /** Feature switches. Flip to true to bring a feature back. */

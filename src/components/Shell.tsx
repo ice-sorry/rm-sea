@@ -116,7 +116,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
     if (!s) return [];
     const ts = teamList.filter((t) => t.name.toLowerCase().includes(s) || t.shortName?.toLowerCase().includes(s)).slice(0, 5).map((t) => ({ kind: 'team' as const, id: t.id, label: t.name }));
     const ps = playerList.filter((p) => p.nameLower?.includes(s) || p.name.toLowerCase().includes(s)).slice(0, 10).map((p) => ({ kind: 'player' as const, id: p.id, label: p.name }));
-    const pages = [['Table', 'table'], ['Teams', 'teams'], ['Players', 'players'], ['Statistics', 'stats'], ['Fixtures', 'fixtures'], ['Awards & Records', 'awards'], ['Cups', 'cups']]
+    const pages = [['Table', 'table'], ['Teams', 'teams'], ['Players', 'players'], ['Statistics', 'stats'], ['Fixtures', 'fixtures'], ['Awards & Records', 'awards'], ['Cups', 'cups'], ['Rules', 'rules']]
       .filter(([l]) => l.toLowerCase().includes(s)).map(([l, r]) => ({ kind: 'page' as const, id: r, label: l }));
     return [...ts, ...ps, ...pages];
   }, [q, playerList, teamList]);
