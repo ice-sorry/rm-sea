@@ -328,7 +328,7 @@ export const decideRequest = onCall(async (req) => {
     const teamRef = db.collection('teams').doc();
     // The new club is not entered into any season; its captain requests to join the current season separately.
     await teamRef.set({
-      name, shortName: name.slice(0, 4).toUpperCase(), nameNormalized: normalizeTeamName(name), color: r.color || '#1D8ADE',
+      name, shortName: (String(r.shortName || '').replace(/\s+/g, '').slice(0, 4) || name.slice(0, 4)).toUpperCase(), nameNormalized: normalizeTeamName(name), color: r.color || '#1D8ADE',
       crestUrl: '', discordRoleId: null, captainIds: [r.playerId], active: true, mergedInto: null,
     });
     let fromTeamId: string | null;

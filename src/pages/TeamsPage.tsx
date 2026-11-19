@@ -65,7 +65,7 @@ export default function TeamsPage() {
 function CreateTeam({ onDone }: { onDone: () => void }) {
   const L = useLeague();
   const { run, busy } = useAction();
-  const [f, setF] = useState({ name: '', color: '#1D8ADE', message: '' });
+  const [f, setF] = useState({ name: '', shortName: '', color: '#1D8ADE', message: '' });
   const p = L.myPlayer;
   return (
     <div className="card stack" style={{ maxWidth: 560 }}>
@@ -80,6 +80,8 @@ function CreateTeam({ onDone }: { onDone: () => void }) {
       ) : (
         <>
           <Field label="Club name"><input className="input" value={f.name} maxLength={40} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+          <Field label="Abbreviation (≤4)"><input className="input" style={{ width: 110, textTransform: 'uppercase' }} maxLength={4} value={f.shortName} placeholder={f.name.trim().slice(0, 4).toUpperCase()}
+            onChange={(e) => setF({ ...f, shortName: e.target.value.replace(/\s+/g, '').toUpperCase().slice(0, 4) })} /></Field>
           <Field label="Colour"><input type="color" value={f.color} onChange={(e) => setF({ ...f, color: e.target.value })} style={{ width: 80, height: 38 }} /></Field>
           <Field label="Message to the admins (optional)"><input className="input" value={f.message} maxLength={200} onChange={(e) => setF({ ...f, message: e.target.value })} /></Field>
           <p className="small muted" style={{ margin: 0 }}>An admin reviews the request. Once approved you become the club's captain{p.currentTeamId ? ' and leave your current team' : ''}. The club isn't entered in a season automatically: request to join the current season from its team page.</p>
@@ -87,7 +89,7 @@ function CreateTeam({ onDone }: { onDone: () => void }) {
             <button className="btn primary" disabled={busy || f.name.trim().length < 2} onClick={() => run(async () => {
               await addDoc(collection(db, 'requests'), {
                 type: 'new_team', playerId: p.id, fromTeamId: p.currentTeamId, toTeamId: null, seasonId: L.general.currentSeasonId || null,
-                status: 'pending', message: f.message, teamName: f.name.trim(), color: f.color, requestedBy: L.authUser!.uid, createdAt: serverTimestamp(),
+                status: 'pending', message: f.message, teamName: f.name.trim(), shortName: f.shortName || f.name.trim().slice(0, 4).toUpperCase(), color: f.color, requestedBy: L.authUser!.uid, createdAt: serverTimestamp(),
               });
               onDone();
             }, 'Request sent. Track it on your profile.')}>Request new club</button>
