@@ -7,7 +7,10 @@ import {
   collection, doc, getDoc, serverTimestamp, writeBatch as fsWriteBatch, FieldValue,
   type CollectionReference, type DocumentReference, type DocumentData, type SetOptions,
 } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, call, db } from './firebase';
+
+// Same pattern as core/public.ts (importing it here would pull the op code into the public bundle).
+const isPublicPath = (path: string) => /^(players|teams|seasons)\/[^/]+$/.test(path);
 
 const AUDITED = [
   /^players\/[^/]+$/, /^teams\/[^/]+$/, /^requests\/[^/]+$/, /^content\/[^/]+$/, /^settings\/[^/]+$/,
@@ -75,6 +78,10 @@ class AuditedBatch {
       });
     }
     await this.inner.commit();
+    // Copy changed players, teams and seasons into the public summaries the site reads (core/public.ts).
+    // Best effort: the write itself has already succeeded.
+    const publicPaths = [...new Set(this.pending.map((p) => p.ref.path).filter(isPublicPath))];
+    if (publicPaths.length) await call('syncPublic')({ paths: publicPaths }).catch(() => undefined);
   }
 }
 

@@ -15,13 +15,14 @@ import { publishRules } from './content';
 import { syncRoles, syncTeamRoles } from './roles';
 import { trackVisit, backupNow, restoreMissing, mergeEntities, savePrivate, addAuditNote } from './ops';
 import { moveToNextSeason, buildWrapped } from './season';
+import { syncPublic } from './public';
 
 export const WORKER_OPS: Record<string, Handler> = {
   discordAuth, refreshClaims,
   claimPlayer, setupPlayer, unclaimPlayer, decideRequest, refreshAvatars, notifyRosterMove, notifyAdminRequest, kickPlayer,
   matchSideEffects,
   publishMatchweek, completeMatchweek, agreeKickoff, registerCommands,
-  publishRules, syncRoles, syncTeamRoles, trackVisit, savePrivate,
+  publishRules, syncRoles, syncTeamRoles, trackVisit, savePrivate, syncPublic,
 };
 
 export const BROWSER_OPS: Record<string, Handler> = {

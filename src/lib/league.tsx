@@ -49,6 +49,20 @@ export const useLeague = () => {
   return v;
 };
 
+/**
+ * Every player, team or season, read from its public summary (derived/players etc., 1 read; see core/public.ts).
+ * Until an admin's first "Recompute season" builds the summary, it reads the whole collection instead.
+ */
+function usePublicCol<T>(name: 'players' | 'teams' | 'seasons'): { data: (T & { id: string })[]; loading: boolean } {
+  const summary = useDoc<{ items?: Record<string, T> }>(`derived/${name}`);
+  const missing = !summary.loading && !summary.data;
+  const fallback = useCol<T>(missing ? name : null);
+  const data = useMemo(() => (summary.data
+    ? Object.entries(summary.data.items || {}).map(([id, v]) => ({ ...v, id }))
+    : fallback.data), [summary.data, fallback.data]);
+  return { data, loading: summary.loading || (missing && fallback.loading) };
+}
+
 export function LeagueProvider({ children }: { children: ReactNode }) {
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -64,15 +78,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   }), []);
 
   const { data: general, loading: gLoading } = useDoc<GeneralSettings>('settings/general');
-  const { data: seasonDocs } = useCol<Season>('seasons');
+  const { data: seasonDocs } = usePublicCol<Season>('seasons');
   const [picked, setPicked] = useState<string | null>(() => {
     try { return sessionStorage.getItem('srl_season'); } catch { return null; }
   });
   const seasonId = picked || general?.currentSeasonId || seasonDocs[0]?.id || null;
   const setSeasonId = (id: string) => { setPicked(id); try { sessionStorage.setItem('srl_season', id); } catch { /* ignore */ } };
 
-  const { data: teamDocs, loading: tLoading } = useCol<Team>('teams');
-  const { data: playerDocs } = useCol<Player>('players');
+  const { data: teamDocs, loading: tLoading } = usePublicCol<Team>('teams');
+  const { data: playerDocs } = usePublicCol<Player>('players');
   const { data: matches } = useCol<MatchDoc>(seasonId ? `seasons/${seasonId}/matches` : null);
   const { data: entryDocs } = useCol<Entry & { id: string }>(seasonId ? `seasons/${seasonId}/entries` : null);
   const { data: rosterDocs } = useCol<{ playerIds: string[] }>(seasonId ? `seasons/${seasonId}/rosters` : null);

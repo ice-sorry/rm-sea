@@ -52,14 +52,16 @@ async function remote(name: string, data: unknown): Promise<any> {
 let local: Promise<(name: string, data: unknown) => Promise<unknown>> | null = null;
 function localRunner() {
   local ??= (async () => {
-    const [{ Firestore }, runtime, { BROWSER_OPS }] = await Promise.all([
-      import('../../core/firestore'), import('../../core/runtime'), import('../../core/index'),
+    const [{ Firestore }, runtime, { BROWSER_OPS }, { installPublicSync }] = await Promise.all([
+      import('../../core/firestore'), import('../../core/runtime'), import('../../core/index'), import('../../core/public'),
     ]);
-    runtime.useDb(new Firestore({
+    const firestore = new Firestore({
       projectId,
       token: async () => (await auth.currentUser?.getIdToken()) ?? null,
       emulatorHost: USE_EMULATORS ? `${host}:8080` : undefined,
-    }));
+    });
+    runtime.useDb(firestore);
+    installPublicSync(firestore);
     runtime.useInvoke(remote);
     return async (name: string, data: unknown) => {
       const user = auth.currentUser;

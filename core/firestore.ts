@@ -309,6 +309,8 @@ export class Transaction extends WriteBatch {
 export class Firestore {
   private readonly base: string;
   private readonly root: string;
+  /** Called with the document paths of every successful commit (see core/public.ts). */
+  onCommitted?: (paths: string[]) => Promise<void>;
   constructor(private readonly opts: DbOptions) {
     this.base = opts.emulatorHost ? `http://${opts.emulatorHost}/v1/` : 'https://firestore.googleapis.com/v1/';
     this.root = `projects/${opts.projectId}/databases/(default)/documents`;
@@ -372,6 +374,12 @@ export class Firestore {
   async _commit(writes: unknown[], transaction?: string) {
     for (let i = 0; i < writes.length; i += 500) {
       await this._fetch('POST', `${this.root}:commit`, { writes: writes.slice(i, i + 500), ...(transaction ? { transaction } : {}) });
+    }
+    if (this.onCommitted) {
+      const prefix = `${this.root}/`;
+      const paths = (writes as { update?: { name?: string }; delete?: string }[])
+        .map((w) => w.update?.name || w.delete || '').filter((n) => n.startsWith(prefix)).map((n) => n.slice(prefix.length));
+      if (paths.length) await this.onCommitted(paths);
     }
   }
   /** @internal */
