@@ -6,7 +6,7 @@ import { useLeague } from '../lib/league';
 import { SectionHeader, Empty, Crest, Field, useAction, Confirm, Avatar, TeamChip, Flag, CountrySelect } from '../components/ui';
 import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Position, Team, Player } from '../lib/types';
-import { actor, normalizeTeamName, notifyRosterMove, syncTeamRoles } from './util';
+import { actor, normalizeTeamName, notifyNewTeam, notifyRosterMove, syncTeamRoles } from './util';
 import { normalizeImageLink } from '../lib/images';
 import { Check, RefreshCw } from 'lucide-react';
 
@@ -24,7 +24,10 @@ export function AdminTeams() {
       color: e.color, crestUrl: e.crestUrl ? normalizeImageLink(e.crestUrl) : '', discordRoleId: e.discordRoleId || null, captainIds: e.captainIds, active: e.active,
     };
     if (e.id) await updateDoc(doc(db, 'teams', e.id), data);
-    else await addDoc(collection(db, 'teams'), { ...data, mergedInto: null });
+    else {
+      const ref = await addDoc(collection(db, 'teams'), { ...data, mergedInto: null });
+      if (data.active) await notifyNewTeam(ref.id);
+    }
     setEdit(null);
   }, 'Team saved');
   const roster = edit?.id ? (L.rosters[edit.id] || []) : [];

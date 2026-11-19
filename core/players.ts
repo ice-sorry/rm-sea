@@ -147,10 +147,13 @@ export async function syncRolesFor(teamIds: (string | null)[]) {
 /** `removed`: an admin took the player off the team (a kick), rather than the player leaving. */
 export interface RosterMove { playerId: string; fromTeamId: string | null; toTeamId: string | null; removed?: boolean }
 
-/** Best-effort Discord post for players who signed for or left a team (needs the bot token, so it runs in the Worker). */
-export async function announceMoves(moves: RosterMove[]) {
+/**
+ * Best-effort Discord post for players who signed for or left a team, and for newly created teams
+ * (needs the bot token, so it runs in the Worker).
+ */
+export async function announceMoves(moves: RosterMove[], newTeamIds: string[] = []) {
   const real = moves.filter((m) => m.playerId && (m.fromTeamId || null) !== (m.toTeamId || null));
-  if (real.length) await invoke('notifyRosterMove', { moves: real }).catch(() => undefined);
+  if (real.length || newTeamIds.length) await invoke('notifyRosterMove', { moves: real, newTeamIds }).catch(() => undefined);
 }
 
 /** True while an admin has closed the transfer window (Admin → Moves → Transfers). */
@@ -160,12 +163,17 @@ export async function transfersBlocked() {
 
 const embedColor = (hex: unknown) => (typeof hex === 'string' && /^#[0-9a-f]{6}$/i.test(hex) ? parseInt(hex.slice(1), 16) : 0x1d8ade);
 
-/** Posts roster moves to the roster channel set in Admin → Settings → Discord & roles. Silently skips when unset. */
+/**
+ * Posts roster moves and newly created teams to the roster channel set in Admin → Settings → Discord & roles.
+ * Silently skips when unset. New teams come first, so a "new team" request reads as created, then signed.
+ */
 export const notifyRosterMove = onCall(async (req) => {
   requireAdmin(req);
-  const moves = (((req.data?.moves as RosterMove[]) || []).filter((m) => m?.playerId && (m.fromTeamId || null) !== (m.toTeamId || null))).slice(0, 10);
+  // Discord allows 10 embeds per message.
+  const newTeamIds = [...new Set(((req.data?.newTeamIds as string[]) || []).filter((t) => typeof t === 'string' && t))].slice(0, 10);
+  const moves = (((req.data?.moves as RosterMove[]) || []).filter((m) => m?.playerId && (m.fromTeamId || null) !== (m.toTeamId || null))).slice(0, 10 - newTeamIds.length);
   const token = DISCORD_BOT_TOKEN.value();
-  if (!moves.length || !token) return { posted: 0 };
+  if ((!moves.length && !newTeamIds.length) || !token) return { posted: 0 };
   const [integ, general] = await Promise.all([
     getSettings<{ rosterChannelId?: string; discordEnabled?: boolean; rosterPosts?: boolean }>('integrations'),
     getSettings<{ siteUrl?: string }>('general'),
@@ -173,10 +181,27 @@ export const notifyRosterMove = onCall(async (req) => {
   const channelId = String(integ.rosterChannelId || '').trim();
   if (!channelId || !discordAllowed(integ, 'rosterPosts')) return { posted: 0 };
   const paths = [...new Set(moves.flatMap((m) => [`players/${m.playerId}`, m.fromTeamId ? `teams/${m.fromTeamId}` : '', m.toTeamId ? `teams/${m.toTeamId}` : '']).filter(Boolean))];
-  const snaps = await db.getAll(...paths.map((x) => db.doc(x)));
-  const data = new Map(paths.map((x, i) => [x, snaps[i].data() || {}]));
+  const teamPaths = newTeamIds.map((t) => `teams/${t}`);
+  const allPaths = [...new Set([...paths, ...teamPaths])];
+  const snaps = await db.getAll(...allPaths.map((x) => db.doc(x)));
+  const data = new Map(allPaths.map((x, i) => [x, snaps[i].data() || {}]));
+  // Captains of the new teams, for the "New team" embed.
+  const captainPaths = [...new Set(teamPaths.flatMap((t) => ((data.get(t)?.captainIds as string[]) || []).map((c) => `players/${c}`)))].filter((c) => !data.has(c));
+  if (captainPaths.length) (await db.getAll(...captainPaths.map((x) => db.doc(x)))).forEach((s, i) => data.set(captainPaths[i], s.data() || {}));
   const site = String(general.siteUrl || '').replace(/\/+$/, '');
-  const embeds = moves.map((m) => {
+  const teamEmbeds = newTeamIds.filter((t) => data.get(`teams/${t}`)?.name).map((t) => {
+    const team = data.get(`teams/${t}`)!;
+    const captains = ((team.captainIds as string[]) || []).map((c) => data.get(`players/${c}`)).filter((p) => p?.name)
+      .map((p) => `**${p!.name}**${p!.discordId ? ` (<@${p!.discordId}>)` : ''}`);
+    return {
+      title: '🆕 New team', description: `**${team.name}** has joined the league.${captains.length ? `\nCaptain: ${captains.join(', ')}` : ''}`,
+      color: embedColor(team.color),
+      ...(site ? { url: `${site}/#team/${encodeURIComponent(t)}` } : {}),
+      ...(team.crestUrl ? { thumbnail: { url: team.crestUrl } } : {}),
+      timestamp: new Date().toISOString(),
+    };
+  });
+  const moveEmbeds = moves.map((m) => {
     const p = data.get(`players/${m.playerId}`) || {};
     const from = m.fromTeamId ? data.get(`teams/${m.fromTeamId}`) : null;
     const to = m.toTeamId ? data.get(`teams/${m.toTeamId}`) : null;
@@ -193,9 +218,11 @@ export const notifyRosterMove = onCall(async (req) => {
       timestamp: new Date().toISOString(),
     };
   });
+  const embeds = [...teamEmbeds, ...moveEmbeds];
+  if (!embeds.length) return { posted: 0 };
   // allowed_mentions: show the player's handle without pinging them.
   await discordApi(token, 'POST', `/channels/${channelId}/messages`, { embeds, allowed_mentions: { parse: [] } });
-  return { posted: moves.length };
+  return { posted: embeds.length };
 });
 
 /** True when the player is on this team: on its season roster, or (between seasons / club not entered) by currentTeamId. */
@@ -313,7 +340,7 @@ export const decideRequest = onCall(async (req) => {
     }
     await ref.update({ status: 'accepted', toTeamId: teamRef.id, decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
     await syncRolesFor([fromTeamId]);
-    await announceMoves([{ playerId: r.playerId, fromTeamId, toTeamId: teamRef.id }]);
+    await announceMoves([{ playerId: r.playerId, fromTeamId, toTeamId: teamRef.id }], [teamRef.id]);
     return { status: 'accepted', teamId: teamRef.id };
   }
   if (r.type === 'leave_team' || r.type === 'kick_player') {

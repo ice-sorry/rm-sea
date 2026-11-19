@@ -16,6 +16,9 @@ export async function afterMatchChange(path: string, resultChanged = true) {
 /** Best-effort Discord post to the roster moves channel (no-op when the channel isn't set). */
 export const notifyRosterMove = (...moves: { playerId: string; fromTeamId: string | null; toTeamId: string | null; removed?: boolean }[]) =>
   call('notifyRosterMove')({ moves }).catch(() => undefined);
+/** Announce a newly created team in the roster moves channel (best effort). */
+export const notifyNewTeam = (teamId: string) =>
+  call('notifyRosterMove')({ moves: [], newTeamIds: [teamId] }).catch(() => undefined);
 export const syncTeamRoles = (...teamIds: (string | null | undefined)[]) =>
   call('syncTeamRoles')({ teamIds: teamIds.filter(Boolean) }).catch(() => undefined);
 

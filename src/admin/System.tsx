@@ -82,7 +82,7 @@ function Discord() {
         <h3 style={{ margin: 0 }}>Discord features</h3>
         <div className="row wrap">{toggle('discordEnabled', 'Discord on', 'Master switch: off stops every bot post, role change and webhook')}</div>
         <div className="row wrap">
-          {toggle('rosterPosts', 'Roster move posts', 'Post when a player signs for or leaves a team')}
+          {toggle('rosterPosts', 'Roster move posts', 'Post when a player signs for or leaves a team, or a new team is created')}
           {toggle('roleSync', 'Team role sync', 'Give and remove team roles when rosters change')}
           {toggle('matchThreads', 'Matchweek threads', 'Create and rename fixture threads')}
           <label className="check"><input type="checkbox" disabled={!on('discordEnabled')} checked={!!f.autoPost} onChange={(e) => setF({ ...f, autoPost: e.target.checked })} />Auto-post results</label>
@@ -95,7 +95,7 @@ function Discord() {
         <div className="form-grid">
           {text('guildId', 'Guild (server) ID')}{text('matchReportChannelId', 'Match report channel ID')}{text('alertsChannelId', 'Alerts channel ID')}{text('rosterChannelId', 'Roster moves channel ID')}
         </div>
-        <p className="small muted" style={{ margin: 0 }}>Roster moves: the bot posts there when a player signs for or leaves a team. Leave it blank to turn the posts off. The bot needs Send Messages and Embed Links in that channel.</p>
+        <p className="small muted" style={{ margin: 0 }}>Roster moves: the bot posts there when a player signs for or leaves a team, or a new team is created. Leave it blank to turn the posts off. The bot needs Send Messages and Embed Links in that channel.</p>
         <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/integrations'), f, { merge: true }), 'Saved')}>Save</button>
       </div>
       <div className="card row wrap">
