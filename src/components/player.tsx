@@ -32,7 +32,7 @@ export function ProfileEditor() {
       </div>
       <Field label="Bio"><textarea className="textarea" style={{ fontFamily: 'inherit', minHeight: 70 }} maxLength={280} value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value })} /></Field>
       <div className="row">
-        <button className="btn primary sm" disabled={busy || f.name.trim().length < 2} onClick={() => run(async () => {
+        <button className="btn primary sm" disabled={busy || f.name.trim().length < 1} onClick={() => run(async () => {
           await updateDoc(doc(db, 'players', p.id), { ...f, name: f.name.trim(), nameLower: f.name.trim().toLowerCase(), updatedAt: serverTimestamp() });
           setOpen(false);
         }, 'Profile saved')}>Save</button>

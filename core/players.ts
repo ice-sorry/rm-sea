@@ -76,7 +76,7 @@ export const setupPlayer = onCall(async (req) => {
 
     if (!eligible) throw new HttpsError('permission-denied', 'Only members with the Verified role in the league Discord can register as a player. Get verified in the server, then try again.');
     const name = String(rawName || '').trim().slice(0, 32);
-    if (name.length < 2) throw new HttpsError('invalid-argument', 'Name is too short.');
+    if (name.length < 1) throw new HttpsError('invalid-argument', 'Name is too short.');
     const position: Position = POSITIONS.includes(rawPos as Position) ? (rawPos as Position) : 'UNSURE';
     const country = /^[A-Za-z]{2}$/.test(String(rawCountry || '')) ? String(rawCountry).toUpperCase() : '';
     const dupe = await tx.get(db.collection('players').where('nameLower', '==', name.toLowerCase()).limit(1));

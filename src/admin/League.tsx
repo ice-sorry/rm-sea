@@ -146,7 +146,7 @@ export function AdminPlayers() {
           <Field label="Team"><select className="select" value={form.teamId} onChange={(e) => setForm({ ...form, teamId: e.target.value })}><option value="">Free agent</option>{L.teamList.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></Field>
           <Field label="Position"><select className="select" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value as Position })}>{POSITIONS.map((p) => <option key={p} value={p}>{POSITION_LABELS[p]}</option>)}</select></Field>
         </div>
-        <button className="btn primary" disabled={busy || form.name.trim().length < 2} onClick={addPlayer}>Add player</button>
+        <button className="btn primary" disabled={busy || form.name.trim().length < 1} onClick={addPlayer}>Add player</button>
       </div>
       {edit && (
         <div className="card stack">
