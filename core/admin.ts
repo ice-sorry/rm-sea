@@ -37,7 +37,7 @@ export async function getSettings<T = Record<string, any>>(id: string): Promise<
   return (s.data() || {}) as T;
 }
 /** Discord switches in Admin → Settings → Discord & roles (settings/integrations). A missing field counts as on. */
-export type DiscordFeature = 'rosterPosts' | 'roleSync' | 'matchThreads';
+export type DiscordFeature = 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads';
 export function discordAllowed(integ: Record<string, unknown>, feature?: DiscordFeature): boolean {
   return integ.discordEnabled !== false && (!feature || integ[feature] !== false);
 }

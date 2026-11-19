@@ -18,7 +18,7 @@ export interface UserDoc {
 }
 export interface RequestDoc {
   id: string; type: 'join_team' | 'transfer' | 'new_team' | 'join_season' | 'leave_season' | 'leave_team' | 'kick_player'; playerId: string; teamId?: string; fromTeamId: string | null; toTeamId: string | null;
-  seasonId: string; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; message: string; teamName?: string; shortName?: string; color?: string;
+  seasonId: string; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; message: string; teamName?: string; shortName?: string; adminNotifiedAt?: unknown; color?: string;
   requestedBy: string; decidedBy?: string; createdAt?: Timestamp; decidedAt?: Timestamp;
 }
 export interface Cup {

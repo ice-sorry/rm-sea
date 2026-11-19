@@ -225,6 +225,66 @@ export const notifyRosterMove = onCall(async (req) => {
   return { posted: embeds.length };
 });
 
+/** Request types only an admin can approve. These are posted to the alerts channel when they're made. */
+const ADMIN_REQUEST_TYPES = ['new_team', 'join_season', 'leave_season', 'kick_player'];
+
+/**
+ * Posts a pending admin-only request to the alerts channel set in Admin → Settings → Discord & roles.
+ * Each request is posted once (adminNotifiedAt). Silently skips when the channel is unset or the posts are off.
+ */
+async function postAdminRequest(requestId: string): Promise<boolean> {
+  const ref = db.doc(`requests/${requestId}`);
+  const snap = await ref.get();
+  const r = snap.data();
+  if (!r || r.status !== 'pending' || r.adminNotifiedAt || !ADMIN_REQUEST_TYPES.includes(r.type)) return false;
+  const token = DISCORD_BOT_TOKEN.value();
+  if (!token) return false;
+  const [integ, general] = await Promise.all([
+    getSettings<{ alertsChannelId?: string; discordEnabled?: boolean; requestPosts?: boolean }>('integrations'),
+    getSettings<{ siteUrl?: string }>('general'),
+  ]);
+  const channelId = String(integ.alertsChannelId || '').trim();
+  if (!channelId || !discordAllowed(integ, 'requestPosts')) return false;
+  const teamId: string | null = r.teamId || null;
+  const paths = [`players/${r.playerId}`, ...(teamId ? [`teams/${teamId}`] : []), ...(r.seasonId ? [`seasons/${r.seasonId}`] : [])];
+  const snaps = await db.getAll(...paths.map((x) => db.doc(x)));
+  const data = new Map(paths.map((x, i) => [x, snaps[i].data() || {}]));
+  const p = data.get(`players/${r.playerId}`) || {};
+  const team = (teamId && data.get(`teams/${teamId}`)) || {};
+  const season = (r.seasonId && data.get(`seasons/${r.seasonId}`)) || {};
+  const who = `**${p.name || 'A player'}**${p.discordId ? ` (<@${p.discordId}>)` : ''}`;
+  const teamName = `**${team.name || 'their team'}**`, seasonName = `**${season.name || 'the current season'}**`;
+  const [title, description, color] =
+    r.type === 'new_team' ? ['🆕 New club request', `${who} wants to create **${r.teamName || '?'}**${r.shortName ? ` (${r.shortName})` : ''}.`, r.color]
+    : r.type === 'join_season' ? ['📥 Season entry request', `${who} wants ${teamName} to join ${seasonName}.`, team.color]
+    : r.type === 'leave_season' ? ['📤 Season exit request', `${who} wants ${teamName} to leave ${seasonName}.`, team.color]
+    : ['🚫 Removal request', `${who} has been put forward for removal from ${teamName}.`, team.color];
+  const message = String(r.message || '').trim();
+  const site = String(general.siteUrl || '').replace(/\/+$/, '');
+  await discordApi(token, 'POST', `/channels/${channelId}/messages`, {
+    embeds: [{
+      title, color: embedColor(color),
+      description: `${description}${message ? `\n> ${message.replace(/\n/g, ' ')}` : ''}\nApprove or decline it in Admin → Moves → Requests.`,
+      ...(site ? { url: `${site}/#admin/moves` } : {}),
+      timestamp: new Date().toISOString(),
+    }],
+    allowed_mentions: { parse: [] },
+  });
+  await ref.update({ adminNotifiedAt: FieldValue.serverTimestamp() });
+  return true;
+}
+
+/** Requester (or an admin): announce a request they just made that needs an admin's approval. */
+export const notifyAdminRequest = onCall(async (req) => {
+  const uid = requireAuth(req);
+  const requestId = String(req.data?.requestId || '');
+  if (!requestId) throw new HttpsError('invalid-argument', 'requestId is required.');
+  const snap = await db.doc(`requests/${requestId}`).get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Request not found.');
+  if (snap.data()!.requestedBy !== uid && !isAdminReq(req)) throw new HttpsError('permission-denied', 'Only the requester can announce this request.');
+  return { posted: await postAdminRequest(requestId) };
+});
+
 /** True when the player is on this team: on its season roster, or (between seasons / club not entered) by currentTeamId. */
 async function isOnTeam(seasonId: string | null, playerId: string, teamId: string) {
   const [p, roster] = await db.getAll(db.doc(`players/${playerId}`), db.doc(`seasons/${seasonId || '-'}/rosters/${teamId}`));
@@ -258,10 +318,11 @@ export const kickPlayer = onCall(async (req) => {
   if (!(await isOnTeam(seasonId, playerId, teamId))) throw new HttpsError('failed-precondition', 'That player is not on this team.');
   const pending = (await db.collection('requests').where('playerId', '==', playerId).where('status', '==', 'pending').get()).docs;
   if (pending.some((d) => d.data()!.type === 'kick_player' && d.data()!.teamId === teamId)) throw new HttpsError('already-exists', 'A removal request for this player is already waiting for an admin.');
-  await db.collection('requests').add({
+  const added = await db.collection('requests').add({
     type: 'kick_player', teamId, playerId, fromTeamId: teamId, toTeamId: null, seasonId: seasonId || null,
     status: 'pending', message: String(req.data?.message || '').slice(0, 200), requestedBy: uid, createdAt: FieldValue.serverTimestamp(),
   });
+  await postAdminRequest(added.id).catch(() => undefined);
   return { requested: true };
 });
 

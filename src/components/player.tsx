@@ -314,10 +314,11 @@ function SeasonEntryCard({ teamId }: { teamId: string }) {
   const isCaptain = !!L.myPlayer && !!team?.captainIds?.includes(L.myPlayer.id);
   const closed = season.locked || season.status === 'complete';
   const send = (type: 'join_season' | 'leave_season') => run(async () => {
-    await addDoc(collection(db, 'requests'), {
+    const ref = await addDoc(collection(db, 'requests'), {
       type, teamId, playerId: L.myPlayer!.id, fromTeamId: null, toTeamId: null, seasonId,
       status: 'pending', message, requestedBy: L.authUser!.uid, createdAt: serverTimestamp(),
     });
+    await call('notifyAdminRequest')({ requestId: ref.id }).catch(() => undefined);
     setMessage('');
   }, 'Request sent to the admins');
   return (

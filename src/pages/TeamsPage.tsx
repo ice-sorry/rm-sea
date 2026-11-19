@@ -1,7 +1,7 @@
 import { CSSProperties, useEffect, useState } from 'react';
 import { collection, getDocs, serverTimestamp } from 'firebase/firestore';
 import { addDoc } from '../lib/db';
-import { db } from '../lib/firebase';
+import { call, db } from '../lib/firebase';
 import { useLeague } from '../lib/league';
 import { PageHeader, Crest, Empty, Skeleton, Field, useAction } from '../components/ui';
 import { SignInButton } from '../components/Shell';
@@ -87,10 +87,12 @@ function CreateTeam({ onDone }: { onDone: () => void }) {
           <p className="small muted" style={{ margin: 0 }}>An admin reviews the request. Once approved you become the club's captain{p.currentTeamId ? ' and leave your current team' : ''}. The club isn't entered in a season automatically: request to join the current season from its team page.</p>
           <div className="row">
             <button className="btn primary" disabled={busy || f.name.trim().length < 2} onClick={() => run(async () => {
-              await addDoc(collection(db, 'requests'), {
+              const ref = await addDoc(collection(db, 'requests'), {
                 type: 'new_team', playerId: p.id, fromTeamId: p.currentTeamId, toTeamId: null, seasonId: L.general.currentSeasonId || null,
                 status: 'pending', message: f.message, teamName: f.name.trim(), shortName: f.shortName || f.name.trim().slice(0, 4).toUpperCase(), color: f.color, requestedBy: L.authUser!.uid, createdAt: serverTimestamp(),
               });
+              // Best effort: a failed Discord post doesn't undo the request.
+              await call('notifyAdminRequest')({ requestId: ref.id }).catch(() => undefined);
               onDone();
             }, 'Request sent. Track it on your profile.')}>Request new club</button>
             <button className="btn ghost" onClick={onDone}>Cancel</button>

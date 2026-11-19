@@ -7,7 +7,7 @@
  */
 import type { Handler } from './runtime';
 import { discordAuth, refreshClaims } from './auth';
-import { claimPlayer, setupPlayer, unclaimPlayer, decideRequest, transferPlayer, refreshAvatars, notifyRosterMove, kickPlayer } from './players';
+import { claimPlayer, setupPlayer, unclaimPlayer, decideRequest, transferPlayer, refreshAvatars, notifyRosterMove, notifyAdminRequest, kickPlayer } from './players';
 import { afterMatchWrite, matchSideEffects, afterCupMatchWrite, recomputeAll } from './derive';
 import { generateSchedule } from './schedule';
 import { publishMatchweek, completeMatchweek, agreeKickoff, registerCommands } from './matchday';
@@ -18,7 +18,7 @@ import { moveToNextSeason, buildWrapped } from './season';
 
 export const WORKER_OPS: Record<string, Handler> = {
   discordAuth, refreshClaims,
-  claimPlayer, setupPlayer, unclaimPlayer, decideRequest, refreshAvatars, notifyRosterMove, kickPlayer,
+  claimPlayer, setupPlayer, unclaimPlayer, decideRequest, refreshAvatars, notifyRosterMove, notifyAdminRequest, kickPlayer,
   matchSideEffects,
   publishMatchweek, completeMatchweek, agreeKickoff, registerCommands,
   publishRules, syncRoles, syncTeamRoles, trackVisit, savePrivate,
