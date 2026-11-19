@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator, memoryLocalCache, clearIndexedDbPersistence } from 'firebase/firestore';
 import { BROWSER_OP_NAMES } from '../../core/opnames';
 
 const env = import.meta.env;
@@ -15,11 +15,17 @@ export const app = initializeApp({
   appId: env.VITE_FIREBASE_APP_ID || 'demo-app',
 });
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Firestore data is kept in memory only, never saved on the device, so nothing (including admin-only data such
+// as webhook URLs) is left behind after the tab closes. Visits stay cheap through the public summaries (core/public.ts).
+export const db = initializeFirestore(app, { localCache: memoryLocalCache() });
 
 if (USE_EMULATORS) {
   connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
   connectFirestoreEmulator(db, host, 8080);
+} else {
+  // A short-lived build saved Firestore data in IndexedDB; delete it. Must run before Firestore is first used.
+  // Fails harmlessly while another tab of that build is still open; the next visit tries again.
+  try { clearIndexedDbPersistence(db).catch(() => undefined); } catch { /* already started */ }
 }
 
 /** Cloudflare Worker base URL (Discord sign-in, bot, webhooks, cross-user actions). */
