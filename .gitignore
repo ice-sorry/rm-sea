@@ -4,6 +4,7 @@ functions/lib/
 functions/node_modules/
 .env.local
 .env.*.local
+.env.production
 functions/.env.local
 .emulator-data/
 *-debug.log
