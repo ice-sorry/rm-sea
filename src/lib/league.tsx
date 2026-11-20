@@ -154,3 +154,20 @@ export async function reloadClaims() {
   await auth.currentUser?.getIdToken(true);
   location.reload();
 }
+
+/** Roster limit set in Admin → Settings → General. 0 means no limit. */
+export function rosterLimit(general: GeneralSettings): number {
+  const n = Math.floor(Number(general.maxRosterSize) || 0);
+  return n > 0 ? n : 0;
+}
+
+/** The team's squad: its season roster when the club is in the selected season, otherwise the players currently on it. */
+export function squadIds(L: Pick<LeagueState, 'rosters' | 'playerList'>, teamId: string): string[] {
+  return L.rosters[teamId] || L.playerList.filter((p) => p.currentTeamId === teamId).map((p) => p.id);
+}
+
+/** True when the team has reached the roster limit and can't accept new players. */
+export function rosterFull(L: Pick<LeagueState, 'rosters' | 'playerList' | 'general'>, teamId: string): boolean {
+  const cap = rosterLimit(L.general);
+  return !!cap && squadIds(L, teamId).length >= cap;
+}

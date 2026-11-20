@@ -2,7 +2,7 @@ import { CSSProperties, useEffect, useState } from 'react';
 import { collection, getDocs, serverTimestamp } from 'firebase/firestore';
 import { addDoc } from '../lib/db';
 import { call, db } from '../lib/firebase';
-import { useLeague } from '../lib/league';
+import { rosterLimit, squadIds, useLeague } from '../lib/league';
 import { PageHeader, Crest, Empty, Skeleton, Field, useAction } from '../components/ui';
 import { SignInButton } from '../components/Shell';
 import { teamHref } from '../modals/ModalContext';
@@ -22,6 +22,7 @@ export default function TeamsPage() {
       .catch(() => setAwards([]));
   }, [L.seasons]);
 
+  const cap = rosterLimit(L.general);
   const teams = L.teamList.filter((t) => t.active !== false && !t.mergedInto).sort((a, b) => a.name.localeCompare(b.name));
   return (
     <>
@@ -34,7 +35,7 @@ export default function TeamsPage() {
             {teams.map((t) => {
               const mine = (awards || []).filter((a) => a.recipientId === t.id);
               // Season roster when the club is in the selected season, otherwise the players currently on it.
-              const count = L.rosters[t.id]?.length ?? L.playerList.filter((p) => p.currentTeamId === t.id).length;
+              const count = squadIds(L, t.id).length;
               const captains = (t.captainIds || []).map((id) => L.players[id]?.name).filter(Boolean);
               return (
                 <a key={t.id} className="team-row" href={teamHref(t.id)} style={{ '--team': t.color || 'var(--accent)' } as CSSProperties}>
@@ -43,7 +44,10 @@ export default function TeamsPage() {
                     <div className="team-name">{t.name}</div>
                     <div className="team-meta">
                       <span><Crown size={16} />{captains.length ? captains.join(', ') : 'No captain'}</span>
-                      <span><Users size={16} />{count} {count === 1 ? 'player' : 'players'}</span>
+                      <span>
+                        <Users size={16} />{cap ? `${count} / ${cap} players` : `${count} ${count === 1 ? 'player' : 'players'}`}
+                        {cap > 0 && count >= cap && <span className="badge">Full</span>}
+                      </span>
                     </div>
                     {mine.length > 0 && (
                       <div className="team-awards">

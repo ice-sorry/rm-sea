@@ -38,6 +38,8 @@ export interface GeneralSettings {
   socials?: Record<string, string>; siteUrl?: string;
   /** Closed transfer window: players can't request to join, transfer or form a club. */
   transfersBlocked?: boolean;
+  /** Most players a team can have; full teams can't accept join/transfer requests. 0 or unset = no limit. */
+  maxRosterSize?: number;
 }
 export type MatchDoc = Match & { verificationIssues?: string[]; verifiedOverride?: boolean };
 export interface StandingsDoc { rows: StandingRow[]; byRound: Record<string, string[]> }

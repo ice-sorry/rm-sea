@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { collection, doc, serverTimestamp, where } from 'firebase/firestore';
 import { addDoc, updateDoc } from '../lib/db';
 import { call, db } from '../lib/firebase';
-import { useLeague } from '../lib/league';
+import { rosterFull, useLeague } from '../lib/league';
 import { useCol, useDoc } from '../lib/hooks';
 import { SectionHeader, Empty, Crest, Avatar, Field, Flag, CountrySelect, useAction } from './ui';
 import { SignInButton } from './Shell';
@@ -92,6 +92,7 @@ export function JoinTeamButton({ teamId }: { teamId: string }) {
   const pending = mine.find((r) => r.status === 'pending' && r.toTeamId === teamId);
   if (pending) return <span className="badge warn" style={{ fontSize: 13, padding: '6px 12px' }}>Request pending</span>;
   if (L.general.transfersBlocked) return <span className="badge" style={{ fontSize: 13, padding: '6px 12px' }} title="An admin has closed the transfer window"><Lock size={13} aria-hidden />Transfers closed</span>;
+  if (rosterFull(L, teamId)) return <span className="badge" style={{ fontSize: 13, padding: '6px 12px' }} title="This team has reached the roster limit"><Lock size={13} aria-hidden />Roster full</span>;
   const transfer = !!p.currentTeamId;
   if (!openForm) return <button className="btn primary" onClick={() => setOpen(true)}>{transfer ? <><Repeat size={15} aria-hidden />Request transfer</> : <><UserPlus size={15} aria-hidden />Request to join</>}</button>;
   return (
@@ -169,6 +170,7 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
   const { data: joins } = useCol<RequestDoc>('requests', where('toTeamId', '==', teamId), where('status', '==', 'pending'));
   const { data: teamReqs } = useCol<RequestDoc>('requests', where('teamId', '==', teamId), where('status', '==', 'pending'));
   const reqs = [...joins, ...teamReqs.filter((r) => r.type === 'leave_team')];
+  const full = rosterFull(L, teamId);
   const fixtures = useMemo(() => L.matches.filter((m) => (m.homeTeamId === teamId || m.awayTeamId === teamId) && ['scheduled', 'agreed'].includes(m.status)).sort((a, b) => a.round - b.round).slice(0, 6), [L.matches, teamId]);
   return (
     <section>
@@ -180,11 +182,13 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
         <div className="card">
           <h3><Bell size={18} aria-hidden />Player requests</h3>
           {!reqs.length && <Empty>No pending requests.</Empty>}
+          {full && reqs.some((r) => r.type !== 'leave_team') && <p className="small muted" style={{ margin: '0 0 6px' }}><Lock size={13} aria-hidden /> Your roster is full. Remove a player to accept new ones.</p>}
           {reqs.map((r) => (
             <div key={r.id} className="row" style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
               <Avatar src={L.players[r.playerId]?.avatarUrl} name={L.players[r.playerId]?.name} size="sm" />
               <span className="grow">{L.players[r.playerId]?.name}<Flag country={L.players[r.playerId]?.country} /><br /><span className="small muted">{r.type === 'leave_team' ? <b>Wants to leave</b> : r.type === 'transfer' ? `from ${L.teams[r.fromTeamId || '']?.name}` : 'free agent'}{r.message ? ` · ${r.message}` : ''}</span></span>
-              <button className="btn sm primary" disabled={busy} onClick={() => run(() => call('decideRequest')({ requestId: r.id, decision: 'accept' }), 'Accepted')}>Accept</button>
+              <button className="btn sm primary" disabled={busy || (full && r.type !== 'leave_team')} title={full && r.type !== 'leave_team' ? 'Roster full: remove a player first' : undefined}
+                onClick={() => run(() => call('decideRequest')({ requestId: r.id, decision: 'accept' }), 'Accepted')}>Accept</button>
               <button className="btn sm" disabled={busy} onClick={() => run(() => call('decideRequest')({ requestId: r.id, decision: 'decline' }), 'Declined')}>Decline</button>
             </div>
           ))}

@@ -50,16 +50,20 @@ function useSettingsForm<T extends Record<string, unknown>>(path: string, defaul
 
 function General() {
   const { run, busy } = useAction();
-  const [f, setF] = useSettingsForm('settings/general', { leagueName: 'SEA Rematch League', siteUrl: '', socials: { youtube: '' } as Record<string, string> });
+  const [f, setF] = useSettingsForm('settings/general', { leagueName: 'SEA Rematch League', siteUrl: '', socials: { youtube: '' } as Record<string, string>, maxRosterSize: 0 });
   return (
     <div className="card stack">
       <div className="form-grid">
         <Field label="League name"><input className="input" value={f.leagueName} onChange={(e) => setF({ ...f, leagueName: e.target.value })} /></Field>
         <Field label="Site URL (for Discord links)"><input className="input" placeholder="https://srl.web.app" value={f.siteUrl} onChange={(e) => setF({ ...f, siteUrl: e.target.value })} /></Field>
         <Field label="YouTube"><input className="input" value={f.socials?.youtube || ''} onChange={(e) => setF({ ...f, socials: { ...f.socials, youtube: e.target.value } })} /></Field>
+        <Field label="Roster limit (players per team, 0 = no limit)">
+          <input className="input" type="number" min={0} step={1} value={f.maxRosterSize || 0}
+            onChange={(e) => setF({ ...f, maxRosterSize: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} />
+        </Field>
       </div>
       <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/general'), f, { merge: true }), 'Saved')}>Save</button>
-      <p className="small muted">Current season and Home mode live under Season.</p>
+      <p className="small muted">Current season and Home mode live under Season. A team at the roster limit can't accept join or transfer requests; admins can still add players directly under Rosters and Moves.</p>
     </div>
   );
 }

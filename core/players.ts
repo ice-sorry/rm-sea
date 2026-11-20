@@ -291,6 +291,19 @@ async function isOnTeam(seasonId: string | null, playerId: string, teamId: strin
   return p.data()?.currentTeamId === teamId || (!!seasonId && (roster.data()?.playerIds || []).includes(playerId));
 }
 
+/** Roster limit from Admin → Settings → General. 0 (or unset) means no limit. */
+async function maxRosterSize() {
+  const n = Math.floor(Number((await getSettings<{ maxRosterSize?: number }>('general')).maxRosterSize) || 0);
+  return n > 0 ? n : 0;
+}
+
+/** Players on a team: its season roster when it has one, otherwise (between seasons / club not entered) by currentTeamId. */
+async function squadSize(seasonId: string | null, teamId: string) {
+  const roster = seasonId ? await db.doc(`seasons/${seasonId}/rosters/${teamId}`).get() : null;
+  if (roster?.exists) return ((roster.data()!.playerIds as string[]) || []).length;
+  return (await db.collection('players').where('currentTeamId', '==', teamId).get()).size;
+}
+
 /** Make a player a free agent, then sync roles and announce it. Callers check permissions and team membership. */
 async function releasePlayer(seasonId: string | null, playerId: string, teamId: string, uid: string, removed = false) {
   if (seasonId) await movePlayer(seasonId, playerId, null, uid, 'request');
@@ -419,6 +432,11 @@ export const decideRequest = onCall(async (req) => {
       .map((d) => d.ref.update({ status: 'cancelled', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() })));
     if (kick) await auditNote(uid, `Removed ${r.playerId} from ${r.teamId} (requested by ${r.requestedBy})`, `players/${r.playerId}`);
     return { status: 'accepted' };
+  }
+  // A full squad can't take new players through requests (admins can still move players directly).
+  const cap = await maxRosterSize();
+  if (cap && r.toTeamId && (await squadSize(seasonId, r.toTeamId)) >= cap) {
+    throw new HttpsError('failed-precondition', `This team's roster is full (${cap} players). Remove a player before accepting new ones.`);
   }
   let moved: { fromTeamId: string | null; toTeamId: string | null };
   if (seasonId) moved = await movePlayer(seasonId, r.playerId, r.toTeamId, uid, 'request');
