@@ -17,6 +17,7 @@ import TeamPage from './pages/TeamPage';
 import TeamsPage from './pages/TeamsPage';
 import PlayersPage from './pages/PlayersPage';
 import MePage from './pages/MePage';
+import RulesPage from './pages/RulesPage';
 
 // Heavy admin panels load on demand.
 const AdminPage = lazy(() => import('./admin/AdminPage'));
@@ -72,6 +73,7 @@ function Routes() {
     case 'players': page = <PlayersPage />; break;
     case 'team': page = <TeamPage key={sub} id={decodeURIComponent(sub)} />; break;
     case 'me': page = <MePage />; break;
+    case 'rules': page = <RulesPage />; break;
     case 'admin': page = <Suspense fallback={<div className="page"><div className="empty">Loading admin…</div></div>}><AdminPage sub={sub} /></Suspense>; break;
     default: page = <HomePage />;
   }

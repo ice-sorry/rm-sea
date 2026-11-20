@@ -12,35 +12,36 @@ import { AdminTransfers, AdminRequests } from './Moves';
 import { AdminRules, AdminRatings } from './Content';
 import { AdminSettings } from './System';
 import { AdminCups } from './Cups';
+import { AlarmClock, Award, Bell, Calendar, CalendarDays, CircleCheck, ClipboardList, Inbox as InboxIcon, Medal, Plus, Repeat, ScrollText, Settings, Shield, Star, TriangleAlert, Trophy, User, type LucideIcon } from 'lucide-react';
 
-interface Screen { key: string; label: string; emoji: string; el: (p: { params: URLSearchParams }) => ReactNode }
+interface Screen { key: string; label: string; icon: LucideIcon; el: (p: { params: URLSearchParams }) => ReactNode }
 const GROUPS: { group: string; screens: Screen[] }[] = [
   { group: 'Match Day', screens: [
-    { key: 'result', label: 'Add Result', emoji: '➕', el: ({ params }) => <AddResult params={params} /> },
-    { key: 'fixtures', label: 'Fixtures', emoji: '🗓️', el: () => <AdminFixtures /> },
-    { key: 'results', label: 'Results', emoji: '✅', el: () => <AdminResults /> },
+    { key: 'result', label: 'Add Result', icon: Plus, el: ({ params }) => <AddResult params={params} /> },
+    { key: 'fixtures', label: 'Fixtures', icon: CalendarDays, el: () => <AdminFixtures /> },
+    { key: 'results', label: 'Results', icon: CircleCheck, el: () => <AdminResults /> },
   ] },
   { group: 'League', screens: [
-    { key: 'teams', label: 'Teams', emoji: '🛡️', el: () => <AdminTeams /> },
-    { key: 'players', label: 'Players', emoji: '👤', el: () => <AdminPlayers /> },
-    { key: 'rosters', label: 'Rosters', emoji: '📋', el: () => <AdminRosters /> },
+    { key: 'teams', label: 'Teams', icon: Shield, el: () => <AdminTeams /> },
+    { key: 'players', label: 'Players', icon: User, el: () => <AdminPlayers /> },
+    { key: 'rosters', label: 'Rosters', icon: ClipboardList, el: () => <AdminRosters /> },
   ] },
   { group: 'Season', screens: [
-    { key: 'season', label: 'Season', emoji: '📅', el: () => <AdminSeason /> },
-    { key: 'playoffs', label: 'Playoffs', emoji: '🏆', el: () => <AdminPlayoffs /> },
-    { key: 'cups', label: 'Cups', emoji: '🥇', el: () => <AdminCups /> },
-    { key: 'awards', label: 'Awards', emoji: '🏅', el: () => <AdminAwards /> },
+    { key: 'season', label: 'Season', icon: Calendar, el: () => <AdminSeason /> },
+    { key: 'playoffs', label: 'Playoffs', icon: Trophy, el: () => <AdminPlayoffs /> },
+    { key: 'cups', label: 'Cups', icon: Award, el: () => <AdminCups /> },
+    { key: 'awards', label: 'Awards', icon: Medal, el: () => <AdminAwards /> },
   ] },
   { group: 'Moves', screens: [
-    { key: 'transfers', label: 'Transfers', emoji: '🔁', el: () => <AdminTransfers /> },
-    { key: 'requests', label: 'Requests', emoji: '📨', el: () => <AdminRequests /> },
+    { key: 'transfers', label: 'Transfers', icon: Repeat, el: () => <AdminTransfers /> },
+    { key: 'requests', label: 'Requests', icon: InboxIcon, el: () => <AdminRequests /> },
   ] },
   { group: 'Content', screens: [
-    { key: 'rules', label: 'Rules', emoji: '📜', el: () => <AdminRules /> },
-    { key: 'ratings', label: 'Ratings', emoji: '⭐', el: () => <AdminRatings /> },
+    { key: 'rules', label: 'Rules', icon: ScrollText, el: () => <AdminRules /> },
+    { key: 'ratings', label: 'Ratings', icon: Star, el: () => <AdminRatings /> },
   ] },
   { group: 'System', screens: [
-    { key: 'settings', label: 'Settings', emoji: '⚙️', el: ({ params }) => <AdminSettings tab={params.get('tab') || 'general'} /> },
+    { key: 'settings', label: 'Settings', icon: Settings, el: ({ params }) => <AdminSettings tab={params.get('tab') || 'general'} /> },
   ] },
 ];
 
@@ -71,19 +72,19 @@ export default function AdminPage({ sub }: { sub: string }) {
     {header}
     <div className="admin">
       <aside className="admin-side">
-        {link('inbox', '🔔 Needs you', inbox.count)}
+        {link('inbox', <span className="row" style={{ gap: 8 }}><Bell size={16} aria-hidden />Needs you</span>, inbox.count)}
         {GROUPS.map((g) => (
           <div key={g.group} style={{ display: 'contents' }}>
             <div className="group">{g.group}</div>
-            {g.screens.map((s) => link(s.key, `${s.emoji} ${s.label}`, s.key === 'requests' ? inbox.pending.length : undefined))}
+            {g.screens.map((s) => link(s.key, <span className="row" style={{ gap: 8 }}><s.icon size={16} aria-hidden />{s.label}</span>, s.key === 'requests' ? inbox.pending.length : undefined))}
           </div>
         ))}
         <div className="signed-in">Signed in as <b>{L.me?.displayName || L.authUser.uid}</b> · {L.claims.role}<br />Season: {L.season?.name || '—'}</div>
       </aside>
       <div style={{ minWidth: 0 }}>
         <nav className="admin-nav-mobile">
-          <a className={`btn sm ${key === 'inbox' ? 'primary' : ''}`} href="#admin/inbox">🔔 {inbox.count || ''}</a>
-          {GROUPS.flatMap((g) => g.screens).map((s) => <a key={s.key} className={`btn sm ${key === s.key ? 'primary' : ''}`} href={`#admin/${s.key}`}>{s.emoji} {s.label}</a>)}
+          <a className={`btn sm ${key === 'inbox' ? 'primary' : ''}`} href="#admin/inbox"><Bell size={14} aria-label="Needs you" />{inbox.count || ''}</a>
+          {GROUPS.flatMap((g) => g.screens).map((s) => <a key={s.key} className={`btn sm ${key === s.key ? 'primary' : ''}`} href={`#admin/${s.key}`}><s.icon size={14} aria-hidden />{s.label}</a>)}
         </nav>
         <main className="admin-main">
           {key === 'inbox' ? <Inbox inbox={inbox} /> : screen ? screen.el({ params }) : <Empty>Unknown screen.</Empty>}
@@ -100,15 +101,15 @@ function Inbox({ inbox }: { inbox: ReturnType<typeof useInbox> }) {
   return (
     <>
       <SectionHeader eyebrow="Admin" title="Needs" accent="you" />
-      {!inbox.count && <Empty>All clear. ✅</Empty>}
+      {!inbox.count && <Empty>All clear.</Empty>}
       {inbox.pending.length > 0 && (
-        <div className="card"><h3>📨 Pending requests ({inbox.pending.length})</h3>
+        <div className="card"><h3><InboxIcon size={18} aria-hidden />Pending requests ({inbox.pending.length})</h3>
           {inbox.pending.map((r) => <div key={r.id} className="row small" style={{ padding: '4px 0' }}><span className="grow">{L.players[r.playerId]?.name} · {r.type.replace('_', ' ')} {r.toTeamId ? `→ ${t(r.toTeamId)}` : r.teamName ? `“${r.teamName}”` : ''}</span></div>)}
           <a className="btn sm" href="#admin/requests">Review requests →</a>
         </div>
       )}
       {inbox.check.length > 0 && (
-        <div className="card"><h3>⚠️ Unverified results ({inbox.check.length})</h3>
+        <div className="card"><h3><TriangleAlert size={18} aria-hidden />Unverified results ({inbox.check.length})</h3>
           {inbox.check.map((m) => (
             <div key={m.id} className="row small" style={{ padding: '4px 0' }}>
               <span className="grow">R{m.round} {t(m.homeTeamId)} {m.seriesHome}–{m.seriesAway} {t(m.awayTeamId)} <span className="muted">· {(m.verificationIssues || []).join('; ')}</span></span>
@@ -118,7 +119,7 @@ function Inbox({ inbox }: { inbox: ReturnType<typeof useInbox> }) {
         </div>
       )}
       {inbox.missing.length > 0 && (
-        <div className="card"><h3>⏰ Missing games ({inbox.missing.length})</h3>
+        <div className="card"><h3><AlarmClock size={18} aria-hidden />Missing games ({inbox.missing.length})</h3>
           {inbox.missing.map((m) => (
             <div key={m.id} className="row small" style={{ padding: '4px 0' }}>
               <span className="grow">R{m.round} {t(m.homeTeamId)} vs {t(m.awayTeamId)} <span className="muted">· {m.status}</span></span>

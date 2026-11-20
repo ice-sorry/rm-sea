@@ -1,7 +1,8 @@
 import { onCall, logger, invoke } from './runtime';
 import type { QuerySnapshot, WriteBatch } from './firestore';
-import { db, FieldValue, getSettings, getPrivateDiscord, requireAdmin } from './admin';
+import { db, FieldValue, getSettings, getPrivateDiscord, discordAllowed, requireAdmin } from './admin';
 import { webhookPost } from './discord';
+import { rebuildPublic } from './public';
 import {
   Bracket, BracketSlot, Entry, Match, Season, DEFAULT_SEASON, summarizeSeries, computeStandings, computePlayerStats,
   computeTeamStats, computeLeaders, recomputeBracket, matchweekOf, stageForRoundKey, PlayerStatRow, StandingRow,
@@ -271,7 +272,7 @@ export const matchSideEffects = onCall(async (req) => {
       if (key) {
         const edited = !!prev;
         const integ = await getSettings<{ autoPost?: boolean; autoPostOnEdit?: boolean }>('integrations');
-        if ((!edited && integ.autoPost) || (edited && integ.autoPostOnEdit)) await postResult(seasonId, m, edited).catch((e) => logger.warn(e));
+        if (discordAllowed(integ) && ((!edited && integ.autoPost) || (edited && integ.autoPostOnEdit))) await postResult(seasonId, m, edited).catch((e) => logger.warn(e));
       }
       await ref.update({ postedResultKey: key });
     }
@@ -345,5 +346,7 @@ export const recomputeAll = onCall(async (req) => {
   const seasons = seasonId ? [seasonId] : (await db.collection('seasons').get()).docs.map((d) => d.id);
   for (const s of seasons) { await recomputeSeason(s); await recomputeSeasonBrackets(s); }
   await recomputeRecords();
+  // Also builds the public summaries the first time (derived/players, teams, seasons).
+  await rebuildPublic();
   return { seasons };
 });

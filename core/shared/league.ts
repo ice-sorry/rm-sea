@@ -9,6 +9,12 @@ export const POSITION_LABELS: Record<Position, string> = {
   GK: 'Goalkeeper', DF: 'Defender', MF: 'Midfielder', WF: 'Wing Forward', ST: 'Striker', UNSURE: 'Flexible',
 };
 
+/**
+ * Season statuses during which roster moves are written to the transfer log (Admin → Moves, home page).
+ * null logs moves at every stage, including pre-season registration. e.g. ['live', 'finals'] for mid-season only.
+ */
+export const TRANSFER_LOG_STATUSES: string[] | null = null;
+
 export type Stage = 'league' | 'wildcard' | 'qf' | 'sf' | 'final' | 'cup';
 export type MatchStatus = 'scheduled' | 'agreed' | 'played' | 'void';
 export type SeasonStatus = 'draft' | 'signups' | 'live' | 'finals' | 'complete';
@@ -32,7 +38,10 @@ export interface Match {
   games: Game[];
   seriesHome: number; seriesAway: number; goalsHome: number; goalsAway: number;
   winnerTeamId: string | null; mvpPlayerId: string | null;
+  /** Legacy: one screenshot for the whole series. New screenshots go in gameScreenshots. */
   screenshotUrls?: string[];
+  /** One screenshot link per game, keyed by game number ("1", "2", ...). */
+  gameScreenshots?: Record<string, string>;
   verification?: 'ok' | 'check';
   discordThreadId?: string | null; bracketSlot?: string | null;
   createdBy?: string; updatedBy?: string; createdAt?: TS; updatedAt?: TS;

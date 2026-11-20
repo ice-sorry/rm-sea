@@ -1,5 +1,5 @@
 import { onCall, logger } from './runtime';
-import { db, requireAdmin, currentSeasonId, DISCORD_BOT_TOKEN, DISCORD_GUILD_ID } from './admin';
+import { db, requireAdmin, currentSeasonId, discordOn, requireDiscordOn, DISCORD_BOT_TOKEN, DISCORD_GUILD_ID } from './admin';
 import { discordApi } from './discord';
 
 // Each Worker invocation may make ≤50 subrequests on the free plan: ~8 go to Firestore, the rest to Discord.
@@ -27,7 +27,7 @@ export const syncTeamRoles = onCall(async (req) => {
   requireAdmin(req);
   const sid = await currentSeasonId();
   const teamIds = ((req.data?.teamIds as string[]) || []).filter(Boolean);
-  if (!sid || !teamIds.length || !DISCORD_BOT_TOKEN.value()) return { added: 0, removed: 0, done: true };
+  if (!sid || !teamIds.length || !DISCORD_BOT_TOKEN.value() || !(await discordOn('roleSync'))) return { added: 0, removed: 0, done: true };
   const [stateSnap, ...rest] = await db.getAll(db.doc(STATE), ...teamIds.flatMap((t) => [db.doc(`teams/${t}`), db.doc(`seasons/${sid}/rosters/${t}`)]));
   const state = (stateSnap.data() || {}) as { seasonId?: string; teams?: Record<string, string[]> };
   const applied = state.seasonId === sid ? { ...(state.teams || {}) } : {};
@@ -64,6 +64,7 @@ export const syncTeamRoles = onCall(async (req) => {
  */
 export const syncRoles = onCall(async (req) => {
   requireAdmin(req);
+  await requireDiscordOn('roleSync');
   const sid = await currentSeasonId();
   if (!sid) return { added: 0, removed: 0, done: true };
   const cursor = Number(req.data?.cursor || 0);

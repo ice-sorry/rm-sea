@@ -17,8 +17,8 @@ export interface UserDoc {
   role: 'user' | 'admin' | 'owner'; guildRoleIds: string[]; playerId: string | null;
 }
 export interface RequestDoc {
-  id: string; type: 'join_team' | 'transfer' | 'new_team' | 'join_season' | 'leave_season'; playerId: string; teamId?: string; fromTeamId: string | null; toTeamId: string | null;
-  seasonId: string; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; message: string; teamName?: string; color?: string;
+  id: string; type: 'join_team' | 'transfer' | 'new_team' | 'join_season' | 'leave_season' | 'leave_team' | 'kick_player'; playerId: string; teamId?: string; fromTeamId: string | null; toTeamId: string | null;
+  seasonId: string; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; message: string; teamName?: string; shortName?: string; adminNotifiedAt?: unknown; color?: string;
   requestedBy: string; decidedBy?: string; createdAt?: Timestamp; decidedAt?: Timestamp;
 }
 export interface Cup {
@@ -36,6 +36,10 @@ export interface Award {
 export interface GeneralSettings {
   currentSeasonId?: string; homeMode?: 'live' | 'pinned'; pinnedSeasonId?: string; leagueName?: string;
   socials?: Record<string, string>; siteUrl?: string;
+  /** Closed transfer window: players can't request to join, transfer or form a club. */
+  transfersBlocked?: boolean;
+  /** Most players a team can have; full teams can't accept join/transfer requests. 0 or unset = no limit. */
+  maxRosterSize?: number;
 }
 export type MatchDoc = Match & { verificationIssues?: string[]; verifiedOverride?: boolean };
 export interface StandingsDoc { rows: StandingRow[]; byRound: Record<string, string[]> }

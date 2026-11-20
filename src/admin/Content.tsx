@@ -8,6 +8,7 @@ import { useCol, useDoc } from '../lib/hooks';
 import { SectionHeader, useAction, Avatar, TeamChip } from '../components/ui';
 import { fmtAgo } from '../lib/format';
 import { actor } from './util';
+import { Megaphone, Save } from 'lucide-react';
 
 export function AdminRules() {
   const { data: rules } = useDoc<{ markdown: string; updatedAt?: { toMillis(): number }; publishedAt?: { toMillis(): number }; discordMessageIds?: string[] }>('content/rules');
@@ -29,8 +30,8 @@ export function AdminRules() {
         <div className="card markdown" style={{ maxHeight: 480, overflowY: 'auto' }} dangerouslySetInnerHTML={{ __html: html }} />
       </div>
       <div className="row">
-        <button className="btn" disabled={busy} onClick={() => run(save, 'Rules saved')}>💾 Save</button>
-        <button className="btn primary" disabled={busy} onClick={() => run(async () => { await save(); return call<unknown, { messages: number; lengths: number[] }>('publishRules')({}); }, (r) => `Published ${r.messages} Discord messages (max ${Math.max(0, ...r.lengths)} chars)`)}>📣 Save & publish to Discord</button>
+        <button className="btn" disabled={busy} onClick={() => run(save, 'Rules saved')}><Save size={15} aria-hidden />Save</button>
+        <button className="btn primary" disabled={busy} onClick={() => run(async () => { await save(); return call<unknown, { messages: number; lengths: number[] }>('publishRules')({}); }, (r) => `Published ${r.messages} Discord messages (max ${Math.max(0, ...r.lengths)} chars)`)}><Megaphone size={15} aria-hidden />Save & publish to Discord</button>
       </div>
       <p className="small muted">Publishing unwraps paragraphs, splits at headings into messages under 2,000 characters, and edits the existing Discord messages in place (extra ones are added or removed).</p>
     </>

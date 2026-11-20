@@ -9,10 +9,17 @@ service cloud.firestore {
     function myPlayerId() { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data.playerId; }
     function discordIdOf(uid) { return uid.split(':')[1]; }
     function captains(t) { return get(/databases/$(db)/documents/teams/$(t)).data.captainIds; }
-    // Captains of either team set the match's single screenshot link (a new link replaces the old one).
+    // Admins close the transfer window in settings/general (Admin → Moves → Transfers).
+    function transfersOpen() {
+      let g = /databases/$(db)/documents/settings/general;
+      return !exists(g) || get(g).data.get('transfersBlocked', false) != true;
+    }
+    // Captains of either team set screenshot links: one per game (gameScreenshots, keyed by game number), or the
+    // older single series screenshot (screenshotUrls). A new link replaces the old one.
     function captainScreenshot() {
-      return signedIn() && changed().hasOnly(['screenshotUrls'])
-        && request.resource.data.screenshotUrls is list && request.resource.data.screenshotUrls.size() <= 1
+      return signedIn() && changed().hasOnly(['screenshotUrls', 'gameScreenshots'])
+        && request.resource.data.get('screenshotUrls', []) is list && request.resource.data.get('screenshotUrls', []).size() <= 1
+        && request.resource.data.get('gameScreenshots', {}) is map && request.resource.data.get('gameScreenshots', {}).size() <= 9
         && (myPlayerId() in captains(resource.data.homeTeamId) || myPlayerId() in captains(resource.data.awayTeamId));
     }
 
@@ -39,7 +46,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /teams/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /teams/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+      // Captains edit their own team's colour (#rrggbb), abbreviation (1-4 characters) and logo link (https or blank).
+      allow update: if signedIn() && changed().hasOnly(['color', 'shortName', 'crestUrl'])
+        && request.resource.data.get('color', '') is string && request.resource.data.get('color', '').matches('^#[0-9a-fA-F]{6}$')
+        && request.resource.data.get('shortName', '') is string && request.resource.data.get('shortName', '').size() >= 1 && request.resource.data.get('shortName', '').size() <= 4
+        && request.resource.data.get('crestUrl', '') is string && request.resource.data.get('crestUrl', '').size() <= 500
+        && (request.resource.data.get('crestUrl', '') == '' || request.resource.data.get('crestUrl', '').matches('^https://[^ ]+$'))
+        && myPlayerId() in resource.data.get('captainIds', []);
+    }
 
     match /seasons/{s} {
       allow read: if true;
@@ -66,11 +83,16 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.requestedBy == request.auth.uid
         && request.resource.data.status == 'pending'
-        && request.resource.data.type in ['join_team', 'transfer', 'new_team', 'join_season', 'leave_season']
+        && request.resource.data.type in ['join_team', 'transfer', 'new_team', 'join_season', 'leave_season', 'leave_team']
         && request.resource.data.playerId == myPlayerId()
+        // Player moves (join, transfer, new club, leaving a club) wait while the transfer window is closed.
+        && (request.resource.data.type in ['join_season', 'leave_season'] || transfersOpen())
         // Only a team's captain may ask for it to join or leave a season (admins decide).
         && (!(request.resource.data.type in ['join_season', 'leave_season'])
-            || myPlayerId() in get(/databases/$(db)/documents/teams/$(request.resource.data.teamId)).data.captainIds);
+            || myPlayerId() in get(/databases/$(db)/documents/teams/$(request.resource.data.teamId)).data.captainIds)
+        // A player can only ask to leave the team they are on.
+        && (request.resource.data.type != 'leave_team'
+            || get(/databases/$(db)/documents/players/$(myPlayerId())).data.currentTeamId == request.resource.data.teamId);
       allow update: if isAdmin(); // captains and requesters decide/cancel via the Worker's decideRequest op
     }
 
@@ -78,7 +100,8 @@ service cloud.firestore {
     match /cups/{c}/matches/{m} { allow update: if captainScreenshot(); }
     match /content/{d}         { allow read: if true; allow write: if isAdmin(); }
     match /settings/{d} {
-      allow read: if d != 'admins';
+      // "|| isAdmin()" lets admins list the whole collection (backups); settings/admins stays admin-only.
+      allow read: if d != 'admins' || isAdmin();
       allow write: if isAdmin() && d != 'admins';
     }
     match /settings/admins     { allow read: if isAdmin(); allow write: if isOwner(); }

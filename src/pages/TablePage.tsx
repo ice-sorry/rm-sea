@@ -8,13 +8,14 @@ import { LeagueTable, LineChart, ZoneLegend } from '../components/league';
 import { computeStandings, groupBy } from '../lib/types';
 import { FEATURES } from '../lib/config';
 import type { Game, MatchDoc, StandingRow } from '../lib/types';
+import { ChartLine, ListOrdered, Telescope, type LucideIcon } from 'lucide-react';
 
 type Tab = 'table' | 'tracker' | 'predict';
-const TABS: { key: Tab; label: string; emoji: string }[] = [
-  { key: 'table', label: 'Table', emoji: '📋' },
-  { key: 'tracker', label: 'Position Tracker', emoji: '📈' },
-  { key: 'predict', label: 'Predict', emoji: '🔮' },
-].filter((t) => t.key !== 'predict' || FEATURES.predictions) as { key: Tab; label: string; emoji: string }[];
+const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
+  { key: 'table', label: 'Table', icon: ListOrdered },
+  { key: 'tracker', label: 'Position Tracker', icon: ChartLine },
+  { key: 'predict', label: 'Predict', icon: Telescope },
+].filter((t) => t.key !== 'predict' || FEATURES.predictions) as { key: Tab; label: string; icon: LucideIcon }[];
 
 export default function TablePage({ sub }: { sub: string }) {
   const tab = (TABS.find((t) => t.key === sub)?.key || 'table') as Tab;
@@ -44,10 +45,10 @@ function DivisionTables({ rows }: { rows: StandingRow[] | null }) {
 }
 
 function TableTab() {
-  const { standings, season } = useLeague();
+  const { standingsRows, season } = useLeague();
   return (
     <ExportCard title={`${season?.name || ''} Standings`} filename={`srl-${season?.id || 'table'}-standings`}>
-      <div className="card flush"><DivisionTables rows={standings?.rows ?? (season ? null : [])} /></div>
+      <div className="card flush"><DivisionTables rows={standingsRows} /></div>
       <ZoneLegend zones={season?.zones || []} />
     </ExportCard>
   );

@@ -1,5 +1,6 @@
 // Minimal offline shell: cache the app shell, network-first for navigation, cache-first for hashed assets.
-const CACHE = 'srl-v1';
+// Bump the version whenever a cached file under /icons/ (or the shell) changes: old caches are deleted on activate.
+const CACHE = 'srl-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/logo.png'];
 
 self.addEventListener('install', (e) => {

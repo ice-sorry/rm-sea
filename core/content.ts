@@ -1,5 +1,5 @@
 import { onCall, HttpsError } from './runtime';
-import { db, FieldValue, getPrivateDiscord, requireAdmin, auditNote } from './admin';
+import { db, FieldValue, getPrivateDiscord, requireAdmin, requireDiscordOn, auditNote } from './admin';
 import { webhookDelete, webhookEdit, webhookPost } from './discord';
 
 const LIMIT = 1900; // stay safely under Discord's 2,000 character cap
@@ -42,6 +42,7 @@ export function splitForDiscord(md: string): string[] {
 
 export const publishRules = onCall(async (req) => {
   const uid = requireAdmin(req);
+  await requireDiscordOn();
   const priv = await getPrivateDiscord();
   if (!priv.rulesWebhookUrl) throw new HttpsError('failed-precondition', 'Set the rules webhook in Settings → Discord.');
   const ref = db.doc('content/rules');

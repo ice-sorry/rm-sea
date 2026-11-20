@@ -6,17 +6,18 @@ import { useLeague, reloadClaims } from '../lib/league';
 import { useCol, useDoc, go } from '../lib/hooks';
 import { SectionHeader, Empty, Field, useAction, Confirm, Tabs } from '../components/ui';
 import { fmtAgo, fmtDateTime } from '../lib/format';
+import { Bot, Bug, ChartLine, Dna, FileSearch, KeyRound, Keyboard, Link, Receipt, RefreshCw, RotateCcw, Save, Tag } from 'lucide-react';
 
 const TABS = [
-  { key: 'general', label: 'General', emoji: '🏷️' },
-  { key: 'discord', label: 'Discord & roles', emoji: '🤖' },
-  { key: 'webhooks', label: 'Webhooks', emoji: '🔗' },
-  { key: 'analytics', label: 'Analytics', emoji: '📈' },
-  { key: 'errors', label: 'Client errors', emoji: '🐞' },
-  { key: 'audit', label: 'Audit log', emoji: '🧾' },
-  { key: 'backup', label: 'Backup', emoji: '💾' },
-  { key: 'merge', label: 'Merge duplicates', emoji: '🧬' },
-  { key: 'admins', label: 'Admins', emoji: '🔑' },
+  { key: 'general', label: 'General', icon: Tag },
+  { key: 'discord', label: 'Discord & roles', icon: Bot },
+  { key: 'webhooks', label: 'Webhooks', icon: Link },
+  { key: 'analytics', label: 'Analytics', icon: ChartLine },
+  { key: 'errors', label: 'Client errors', icon: Bug },
+  { key: 'audit', label: 'Audit log', icon: Receipt },
+  { key: 'backup', label: 'Backup', icon: Save },
+  { key: 'merge', label: 'Merge duplicates', icon: Dna },
+  { key: 'admins', label: 'Admins', icon: KeyRound },
 ];
 
 export function AdminSettings({ tab }: { tab: string }) {
@@ -49,16 +50,20 @@ function useSettingsForm<T extends Record<string, unknown>>(path: string, defaul
 
 function General() {
   const { run, busy } = useAction();
-  const [f, setF] = useSettingsForm('settings/general', { leagueName: 'SEA Rematch League', siteUrl: '', socials: { youtube: '' } as Record<string, string> });
+  const [f, setF] = useSettingsForm('settings/general', { leagueName: 'SEA Rematch League', siteUrl: '', socials: { youtube: '' } as Record<string, string>, maxRosterSize: 0 });
   return (
     <div className="card stack">
       <div className="form-grid">
         <Field label="League name"><input className="input" value={f.leagueName} onChange={(e) => setF({ ...f, leagueName: e.target.value })} /></Field>
         <Field label="Site URL (for Discord links)"><input className="input" placeholder="https://srl.web.app" value={f.siteUrl} onChange={(e) => setF({ ...f, siteUrl: e.target.value })} /></Field>
         <Field label="YouTube"><input className="input" value={f.socials?.youtube || ''} onChange={(e) => setF({ ...f, socials: { ...f.socials, youtube: e.target.value } })} /></Field>
+        <Field label="Roster limit (players per team, 0 = no limit)">
+          <input className="input" type="number" min={0} step={1} value={f.maxRosterSize || 0}
+            onChange={(e) => setF({ ...f, maxRosterSize: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} />
+        </Field>
       </div>
       <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/general'), f, { merge: true }), 'Saved')}>Save</button>
-      <p className="small muted">Current season and Home mode live under Season.</p>
+      <p className="small muted">Current season and Home mode live under Season. A team at the roster limit can't accept join or transfer requests; admins can still add players directly under Rosters and Moves.</p>
     </div>
   );
 }
@@ -66,25 +71,42 @@ function General() {
 function Discord() {
   const { run, busy } = useAction();
   const [f, setF] = useSettingsForm('settings/integrations', {
-    guildId: '1562776724431831050', matchReportChannelId: '', alertsChannelId: '', autoPost: true, autoPostOnEdit: false,
+    guildId: '1562776724431831050', matchReportChannelId: '', alertsChannelId: '', rosterChannelId: '', autoPost: true, autoPostOnEdit: false,
+    discordEnabled: true, rosterPosts: true, requestPosts: true, roleSync: true, matchThreads: true,
   });
+  // Older settings docs lack the switches; a missing switch counts as on (the Worker reads it the same way).
+  const on = (k: 'discordEnabled' | 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads') => f[k] !== false;
+  const toggle = (k: 'discordEnabled' | 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads', label: string, hint: string) => (
+    <label className="check" title={hint}><input type="checkbox" disabled={k !== 'discordEnabled' && !on('discordEnabled')} checked={on(k)} onChange={(e) => setF({ ...f, [k]: e.target.checked })} />{label}</label>
+  );
   const text = (k: keyof typeof f, label: string) => <Field label={label}><input className="input" value={String(f[k] ?? '')} onChange={(e) => setF({ ...f, [k]: e.target.value.trim() })} /></Field>;
   return (
     <div className="stack">
       <div className="card stack">
-        <div className="form-grid">
-          {text('guildId', 'Guild (server) ID')}{text('matchReportChannelId', 'Match report channel ID')}{text('alertsChannelId', 'Alerts channel ID')}
-        </div>
+        <h3 style={{ margin: 0 }}>Discord features</h3>
+        <div className="row wrap">{toggle('discordEnabled', 'Discord on', 'Master switch: off stops every bot post, role change and webhook')}</div>
         <div className="row wrap">
-          <label className="check"><input type="checkbox" checked={!!f.autoPost} onChange={(e) => setF({ ...f, autoPost: e.target.checked })} />Auto-post results to Discord</label>
-          <label className="check"><input type="checkbox" checked={!!f.autoPostOnEdit} onChange={(e) => setF({ ...f, autoPostOnEdit: e.target.checked })} />…and when a result is edited</label>
+          {toggle('rosterPosts', 'Roster move posts', 'Post when a player signs for or leaves a team, or a new team is created')}
+          {toggle('requestPosts', 'Admin request posts', 'Post when someone makes a request only an admin can approve: a new club, a season entry or exit, or a removal')}
+          {toggle('roleSync', 'Team role sync', 'Give and remove team roles when rosters change')}
+          {toggle('matchThreads', 'Matchweek threads', 'Create and rename fixture threads')}
+          <label className="check"><input type="checkbox" disabled={!on('discordEnabled')} checked={!!f.autoPost} onChange={(e) => setF({ ...f, autoPost: e.target.checked })} />Auto-post results</label>
+          <label className="check"><input type="checkbox" disabled={!on('discordEnabled') || !f.autoPost} checked={!!f.autoPostOnEdit} onChange={(e) => setF({ ...f, autoPostOnEdit: e.target.checked })} />…and when a result is edited</label>
         </div>
+        <p className="small muted" style={{ margin: 0 }}>With Discord off, nothing is sent to Discord: no posts, role changes, threads, rules or results. Sign-in with Discord keeps working. Turning role sync back on doesn't catch up on its own; press <b>Sync team roles</b> below.</p>
+        <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/integrations'), f, { merge: true }), 'Saved')}>Save</button>
+      </div>
+      <div className="card stack">
+        <div className="form-grid">
+          {text('guildId', 'Guild (server) ID')}{text('matchReportChannelId', 'Match report channel ID')}{text('alertsChannelId', 'Alerts channel ID')}{text('rosterChannelId', 'Roster moves channel ID')}
+        </div>
+        <p className="small muted" style={{ margin: 0 }}>Roster moves: the bot posts there when a player signs for or leaves a team, or a new team is created. Alerts: the bot posts there when someone asks for a new club, a season entry or exit, or a player's removal, so an admin can approve it. Leave a channel blank to turn its posts off. The bot needs Send Messages and Embed Links in those channels.</p>
         <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/integrations'), f, { merge: true }), 'Saved')}>Save</button>
       </div>
       <div className="card row wrap">
-        <button className="btn" disabled={busy} onClick={() => run(() => call<unknown, { added: number; removed: number }>('syncRoles')({}), (r) => `Roles synced: ${r.added} added, ${r.removed} removed`)}>🔄 Sync team roles</button>
-        <button className="btn" disabled={busy} onClick={() => run(() => call('registerCommands')({}), 'Registered /standings and /next')}>⌨️ Register slash commands</button>
-        <button className="btn" disabled={busy} onClick={() => run(async () => { await call('refreshClaims')({}); await reloadClaims(); })}>🔑 Refresh my claims</button>
+        <button className="btn" disabled={busy} onClick={() => run(() => call<unknown, { added: number; removed: number }>('syncRoles')({}), (r) => `Roles synced: ${r.added} added, ${r.removed} removed`)}><RefreshCw size={15} aria-hidden />Sync team roles</button>
+        <button className="btn" disabled={busy} onClick={() => run(() => call('registerCommands')({}), 'Registered /standings and /next')}><Keyboard size={15} aria-hidden />Register slash commands</button>
+        <button className="btn" disabled={busy} onClick={() => run(async () => { await call('refreshClaims')({}); await reloadClaims(); })}><KeyRound size={15} aria-hidden />Refresh my claims</button>
       </div>
       <p className="small muted">Interactions endpoint for the Discord app: <code>{API_URL || 'https://<your-worker>.workers.dev'}/interactions</code></p>
     </div>
@@ -137,7 +159,7 @@ function Errors() {
   const { data } = useCol<{ message: string; stack: string; url: string; userAgent: string; uid: string | null; firstAt: { toMillis(): number } }>('clientErrors', orderBy('firstAt', 'desc'), limit(50));
   return (
     <div className="stack">
-      {!data.length && <Empty>No client errors reported. 🎉</Empty>}
+      {!data.length && <Empty>No client errors reported.</Empty>}
       {data.map((e) => (
         <details key={e.id} className="card">
           <summary style={{ cursor: 'pointer' }}><b>{e.message}</b> <span className="small muted">· {fmtAgo(e.firstAt)} · {e.uid || 'anonymous'}</span></summary>
@@ -203,14 +225,14 @@ function Backup() {
   return (
     <div className="stack">
       <div className="card row wrap">
-        <button className="btn primary" disabled={busy} onClick={() => run(async () => { const r = await call<unknown, { total: number; json: string }>('backupNow')({}); download(r.json); return r; }, (r) => `Backed up ${r.total} documents — a copy was downloaded`)}>💾 Back up now</button>
+        <button className="btn primary" disabled={busy} onClick={() => run(async () => { const r = await call<unknown, { total: number; json: string }>('backupNow')({}); download(r.json); return r; }, (r) => `Backed up ${r.total} documents — a copy was downloaded`)}><Save size={15} aria-hidden />Back up now</button>
         <span className="small muted">Backups are manual on the free plan: each one is stored here and downloaded as a JSON file — keep those somewhere safe. Restore only re-creates documents missing from live data — it never overwrites.</span>
       </div>
       {L.isOwner && (
         <div className="card row wrap">
           <span className="small">Restore from a downloaded backup file:</span>
-          <label className="btn sm">🔍 Dry run<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) restoreFile(f, true); }} /></label>
-          <label className="btn sm primary">♻️ Restore missing<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f && confirm('Re-create documents missing from live data?')) restoreFile(f, false); }} /></label>
+          <label className="btn sm"><FileSearch size={14} aria-hidden />Dry run<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) restoreFile(f, true); }} /></label>
+          <label className="btn sm primary"><RotateCcw size={14} aria-hidden />Restore missing<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f && confirm('Re-create documents missing from live data?')) restoreFile(f, false); }} /></label>
         </div>
       )}
       {result && <pre className="json">{result}</pre>}
@@ -262,7 +284,7 @@ function Merge() {
           <Field label="Keep"><select className="select" value={pair.keepId} onChange={(e) => setPair({ ...pair, keepId: e.target.value })}><option value="">—</option>{list.map((x) => <option key={x.id} value={x.id}>{label(x.id)} · {x.id.slice(0, 6)}</option>)}</select></Field>
         </div>
         <Confirm className="btn primary" text="Merge? Every fixture, result, roster, award and allowlist reference is rewritten to the kept ID. A backup is taken first." onYes={() => run(() => call<unknown, { rewritten: number; moved: number }>('mergeEntities')({ kind, ...pair }), (r) => `Merged: ${r.rewritten} docs rewritten, ${r.moved} moved`)}>
-          {busy ? 'Merging…' : '🧬 Merge'}
+          {busy ? 'Merging…' : <><Dna size={15} aria-hidden />Merge</>}
         </Confirm>
       </div>
     </div>
@@ -272,7 +294,7 @@ function Merge() {
 function Admins() {
   const L = useLeague();
   const { run, busy } = useAction();
-  const [f, setF] = useSettingsForm('settings/admins', { adminUids: [] as string[], ownerUids: [] as string[], adminRoleIds: ['1562781903604424794', '1563169917384134827'] as string[] });
+  const [f, setF] = useSettingsForm('settings/admins', { adminUids: [] as string[], ownerUids: [] as string[], adminRoleIds: ['1562781903604424794', '1563169917384134827'] as string[], playerRoleIds: [] as string[] });
   const [uid, setUid] = useState('');
   const lines = (v: string[]) => v.join('\n');
   const parse = (s: string) => s.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
@@ -286,6 +308,9 @@ function Admins() {
           <Field label="Admin UIDs"><textarea className="textarea" value={lines(f.adminUids)} onChange={(e) => setF({ ...f, adminUids: parse(e.target.value) })} /></Field>
           <Field label="Admin Discord role IDs"><textarea className="textarea" value={lines(f.adminRoleIds)} onChange={(e) => setF({ ...f, adminRoleIds: parse(e.target.value) })} /></Field>
         </div>
+        <Field label="Player Discord role IDs (e.g. Verified)"><textarea className="textarea" value={lines(f.playerRoleIds || [])} onChange={(e) => setF({ ...f, playerRoleIds: parse(e.target.value) })} /></Field>
+        <p className="small muted" style={{ margin: 0 }}>Only Discord members holding one of these roles can create a player. Leave empty to let anyone register.
+          Players an admin already linked to an account can still be claimed.</p>
         <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/admins'), f), 'Admins saved — refresh their claims below')}>Save</button>
       </div>
       <div className="card row">

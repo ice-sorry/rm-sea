@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { orderBy } from 'firebase/firestore';
-import { call } from '../lib/firebase';
+import { doc, orderBy } from 'firebase/firestore';
+import { setDoc } from '../lib/db';
+import { call, db } from '../lib/firebase';
 import { useLeague } from '../lib/league';
 import { useCol } from '../lib/hooks';
 import { SectionHeader, Empty, Field, useAction, TeamChip, Tabs } from '../components/ui';
 import { fmtAgo, ms } from '../lib/format';
 import type { RequestDoc } from '../lib/types';
+import { Lock, LockOpen } from 'lucide-react';
 
 export function AdminTransfers() {
   const L = useLeague();
@@ -14,10 +16,12 @@ export function AdminTransfers() {
     L.seasonId ? `seasons/${L.seasonId}/transfers` : null, orderBy('createdAt', 'desc'));
   const nextRound = Math.max(0, ...L.matches.filter((m) => m.status === 'played' && m.stage === 'league').map((m) => m.round)) + 1;
   const [f, setF] = useState({ playerId: '', toTeamId: '', startingRound: nextRound });
-  const from = f.playerId ? Object.entries(L.rosters).find(([, ps]) => ps.includes(f.playerId))?.[0] : undefined;
+  // Season roster first; a club that hasn't entered the season has no roster, so fall back to the player's team.
+  const from = f.playerId ? Object.entries(L.rosters).find(([, ps]) => ps.includes(f.playerId))?.[0] || L.players[f.playerId]?.currentTeamId || undefined : undefined;
   return (
     <>
       <SectionHeader eyebrow={`Moves · ${L.season?.name || ''}`} title="Mid-season" accent="transfers" />
+      <TransferWindow />
       <div className="card stack">
         <div className="form-grid">
           <Field label="Player"><select className="select" value={f.playerId} onChange={(e) => setF({ ...f, playerId: e.target.value })}><option value="">—</option>{L.playerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
@@ -41,6 +45,26 @@ export function AdminTransfers() {
   );
 }
 
+/** Admin switch for the transfer window. Closed: players can't ask to join, transfer or form a club, and captains
+ *  can't accept pending moves. Admins can still move players and accept requests. */
+function TransferWindow() {
+  const L = useLeague();
+  const { run, busy } = useAction();
+  const blocked = !!L.general.transfersBlocked;
+  return (
+    <div className="card row wrap">
+      <span className={`badge ${blocked ? 'warn' : 'ok'}`} style={{ fontSize: 13, padding: '4px 10px' }}>{blocked ? <><Lock size={13} aria-hidden />Transfers closed</> : <><LockOpen size={13} aria-hidden />Transfers open</>}</span>
+      <span className="grow small muted">{blocked
+        ? "Players can't request to join, transfer or create a club, and captains can't accept pending moves. Admins can still move players."
+        : 'Players can request to join or transfer, and captains can accept.'}</span>
+      <button className={`btn ${blocked ? 'primary' : 'danger'}`} disabled={busy}
+        onClick={() => run(() => setDoc(doc(db, 'settings/general'), { transfersBlocked: !blocked }, { merge: true }), blocked ? 'Transfers reopened' : 'Transfers closed')}>
+        {blocked ? 'Open transfers' : 'Block transfers'}
+      </button>
+    </div>
+  );
+}
+
 export function AdminRequests() {
   const L = useLeague();
   const { run, busy } = useAction();
@@ -59,9 +83,9 @@ export function AdminRequests() {
           <tbody>{list.map((r) => (
             <tr key={r.id}>
               <td>{L.players[r.playerId]?.name}</td>
-              <td className="small">{r.type.replace('_', ' ')}{(r.type === 'join_season' || r.type === 'leave_season') && <><br /><span className="muted">{L.seasons.find((x) => x.id === r.seasonId)?.name || r.seasonId}</span></>}</td>
+              <td className="small">{r.type === 'kick_player' ? <b>removal</b> : r.type.replace('_', ' ')}{(r.type === 'join_season' || r.type === 'leave_season') && <><br /><span className="muted">{L.seasons.find((x) => x.id === r.seasonId)?.name || r.seasonId}</span></>}</td>
               <td>{r.type === 'leave_season' ? <TeamChip team={r.teamId ? L.teams[r.teamId] : null} /> : r.type === 'join_season' ? '—' : <TeamChip team={r.fromTeamId ? L.teams[r.fromTeamId] : null} />}</td>
-              <td>{r.type === 'new_team' ? <span className="row"><i style={{ display: 'inline-block', width: 12, height: 12, background: r.color, borderRadius: 3 }} />{r.teamName}</span>
+              <td>{r.type === 'new_team' ? <span className="row"><i style={{ display: 'inline-block', width: 12, height: 12, background: r.color, borderRadius: 3 }} />{r.teamName}{r.shortName && <span className="muted"> ({r.shortName})</span>}</span>
                 : r.type === 'join_season' ? <TeamChip team={r.teamId ? L.teams[r.teamId] : null} />
                 : r.type === 'leave_season' ? <span className="small muted">leaves season</span>
                 : <TeamChip team={r.toTeamId ? L.teams[r.toTeamId] : null} />}</td>

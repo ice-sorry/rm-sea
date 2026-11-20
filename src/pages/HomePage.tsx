@@ -9,6 +9,7 @@ import { BracketView, FixtureCard, LeagueTable, ResultCard, useMatchLists } from
 import { useModal } from '../modals/ModalContext';
 import { fmtAgo, fmtDateTime } from '../lib/format';
 import type { Award, Bracket, Season, StandingsDoc } from '../lib/types';
+import { Trophy } from 'lucide-react';
 
 export default function HomePage() {
   const L = useLeague();
@@ -17,7 +18,7 @@ export default function HomePage() {
   return (
     <>
       <HomeHero />
-      <main className="page">
+      <main className="page home-page">
         {season && (
           <div className="season-heading">
             <h2 className="title">{season.name}</h2>
@@ -45,12 +46,15 @@ export default function HomePage() {
 
 const STATUS_LABEL: Record<string, string> = { draft: 'Coming soon', signups: 'Sign-ups open', live: 'In progress', finals: 'Finals', complete: 'Complete' };
 
+/** Home banner logo (public/home/logo.png). Falls back to the small app icon until that file exists. */
+const HOME_LOGO = '/home/logo.png';
+
 /** Centered home banner: logo, league name, a short intro and the Discord invite. */
 function HomeHero() {
   return (
     <header className="page-header home-hero">
       <div className="page-header-inner">
-        <img src={BRAND.logo} alt="" className="home-hero-logo" />
+        <img src={HOME_LOGO} alt="" className="home-hero-logo" onError={(e) => { if (!e.currentTarget.src.endsWith(BRAND.logo)) e.currentTarget.src = BRAND.logo; }} />
         <h1 className="title">{BRAND.appName.replace(/ League$/, '')} <em>League</em></h1>
         <p className="home-hero-desc">
           The competitive hub for {BRAND.region} {BRAND.game} and the top {BRAND.region} players.
@@ -203,7 +207,7 @@ function Standings() {
   return (
     <section>
       <SectionHeader eyebrow="The race" title="League" accent="standings" link="#table" linkLabel="Full table →" />
-      <div className="card flush"><LeagueTable compact rows={L.standings?.rows ?? (L.season ? null : [])} zones={L.season?.zones || []} /></div>
+      <div className="card flush"><LeagueTable compact rows={L.standingsRows} zones={L.season?.zones || []} /></div>
     </section>
   );
 }
@@ -212,7 +216,7 @@ function Standings() {
 function PinnedCelebration({ seasonId }: { seasonId: string }) {
   const L = useLeague();
   const { open } = useModal();
-  const { data: standings } = useDoc<StandingsDoc>(`seasons/${seasonId}/derived/standings`);
+  const { data: standings, loading: standingsLoading } = useDoc<StandingsDoc>(`seasons/${seasonId}/derived/standings`);
   const { data: awards } = useCol<Award>(`seasons/${seasonId}/awards`);
   const season = L.seasons.find((s) => s.id === seasonId);
   const championAward = awards.find((a) => a.type === 'champion');
@@ -223,7 +227,7 @@ function PinnedCelebration({ seasonId }: { seasonId: string }) {
     <PageHeader eyebrow={BRAND.appName} title={season?.name || seasonId} accent="champions" />
     <main className="page">
       <div className="hero-pin">
-        <div className="trophy">🏆</div>
+        <div className="trophy"><Trophy size={64} aria-hidden /></div>
         <div className="eyebrow">{season?.name || seasonId} champions</div>
         <h1 className="title" style={{ fontSize: 56 }}>{champ?.name || 'TBC'}</h1>
         {champ && <div style={{ marginTop: 16 }}><Crest team={champ} size="lg" /></div>}
@@ -244,7 +248,7 @@ function PinnedCelebration({ seasonId }: { seasonId: string }) {
       </section>
       <section>
         <SectionHeader eyebrow="Final standings" title="The final" accent="table" />
-        <div className="card flush"><LeagueTable rows={standings?.rows || null} zones={season?.zones || []} /></div>
+        <div className="card flush"><LeagueTable rows={standings?.rows ?? (standingsLoading ? null : [])} zones={season?.zones || []} /></div>
       </section>
     </main>
     </>

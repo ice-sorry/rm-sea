@@ -70,7 +70,7 @@ function Setup() {
       <Field label={<>Country <Flag country={country} /></>}><CountrySelect value={country} onChange={setCountry} /></Field>
       <p className="small muted">New players start as free agents. Afterwards, open a team's page from <a href="#teams">Teams</a> to ask to join.
         Played before under another account? Ask an admin to link your old player to this Discord account.</p>
-      <button className="btn primary" disabled={busy || name.trim().length < 2} onClick={() => setup({ name: name.trim(), position, country })}>Create my player</button>
+      <button className="btn primary" disabled={busy || name.trim().length < 1} onClick={() => setup({ name: name.trim(), position, country })}>Create my player</button>
     </div>
   );
 }

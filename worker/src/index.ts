@@ -6,6 +6,7 @@
 import { Firestore } from '../../core/firestore';
 import { useDb, configure, useIdentity, useInvoke, HttpsError, CallableRequest } from '../../core/runtime';
 import { WORKER_OPS, handleInteraction } from '../../core/index';
+import { installPublicSync } from '../../core/public';
 import { refreshAttachmentUrl } from '../../core/discord';
 import { canonicalDiscordAttachment } from '../../core/shared/league';
 import { accessToken, applyClaims, createCustomToken, verifyIdToken, ServiceAccount } from './google';
@@ -28,7 +29,9 @@ function init(env: Env) {
   const sa: ServiceAccount | null = env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(env.FIREBASE_SERVICE_ACCOUNT) : null;
   if (!sa && !emulator) throw new Error('FIREBASE_SERVICE_ACCOUNT secret is not set.');
   const token = async () => (sa && !emulator ? accessToken(sa) : 'owner'); // "owner" = emulator admin access
-  useDb(new Firestore({ projectId: env.FIREBASE_PROJECT_ID, token, emulatorHost: env.FIRESTORE_EMULATOR_HOST }));
+  const firestore = new Firestore({ projectId: env.FIREBASE_PROJECT_ID, token, emulatorHost: env.FIRESTORE_EMULATOR_HOST });
+  useDb(firestore);
+  installPublicSync(firestore);
   useIdentity({
     applyClaims: (uid, claims, profile) => applyClaims({ projectId: env.FIREBASE_PROJECT_ID, emulatorHost: env.FIREBASE_AUTH_EMULATOR_HOST, token }, uid, claims, profile),
     createCustomToken: (uid) => createCustomToken(emulator ? null : sa, uid),

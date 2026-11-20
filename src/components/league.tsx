@@ -6,13 +6,15 @@ import { fmtDate, fmtDateTime, signed } from '../lib/format';
 import { FEATURES } from '../lib/config';
 import type { Bracket, LeaderEntry, MatchDoc, StandingRow, Zone } from '../lib/types';
 import { LEADER_CATEGORIES, zoneFor } from '../lib/types';
+import { CircleCheck, TriangleAlert } from 'lucide-react';
+import { LeaderIcon } from './icons';
 
 // ---------- League table ----------
 export function LeagueTable({ rows, compact, zones, divisionName }: { rows: StandingRow[] | null; compact?: boolean; zones: Zone[]; divisionName?: string }) {
   const { teams } = useLeague();
   const { open } = useModal();
   if (!rows) return <Skeleton rows={8} />;
-  if (!rows.length) return <Empty>No teams entered yet.</Empty>;
+  if (!rows.length) return <Empty>There are no teams in the league yet.</Empty>;
   return (
     <div className="table-wrap">
       {divisionName && <div className="eyebrow" style={{ padding: '8px 8px 0' }}>{divisionName}</div>}
@@ -64,7 +66,7 @@ export function ResultCard({ m, cupId, seasonId }: { m: MatchDoc; cupId?: string
   return (
     <div className="match-card" onClick={() => open({ kind: 'match', id: m.id, cupId, seasonId })}>
       <span className="tint" style={{ background: h?.color }} /><span className="tint r" style={{ background: a?.color }} />
-      <div className="meta"><span>{stageLabel(m)}</span><span>{fmtDate(m.matchDate || m.kickoffAt)}{m.verification === 'check' && ' · ⚠️'}</span></div>
+      <div className="meta"><span>{stageLabel(m)}</span><span>{fmtDate(m.matchDate || m.kickoffAt)}{m.verification === 'check' && <> · <TriangleAlert size={12} aria-label="Needs a check" /></>}</span></div>
       <div className="teams">
         <div className={`side ${hw ? 'winner' : aw ? 'loser' : ''}`}><Crest team={h} /><span className="ellipsis">{h?.name}</span></div>
         <div className="score num">{m.seriesHome}–{m.seriesAway}</div>
@@ -92,7 +94,7 @@ export function FixtureCard({ m, cupId }: { m: MatchDoc; cupId?: string }) {
         <div className="score vs">vs</div>
         <div className="side away"><span className="ellipsis">{a?.name}</span><Crest team={a} /></div>
       </div>
-      <div className="games">{m.status === 'agreed' ? '✅ Time agreed' : ''}</div>
+      <div className="games">{m.status === 'agreed' ? <><CircleCheck size={12} aria-hidden /> Time agreed</> : ''}</div>
     </div>
   );
 }
@@ -105,7 +107,7 @@ export function LeaderList({ category, entries, limit = 5 }: { category: string;
   return (
     <div className="card">
       <div className="row between" style={{ marginBottom: 6 }}>
-        <h3 style={{ margin: 0 }}>{cat?.emoji} {cat?.label}</h3>
+        <h3 style={{ margin: 0 }}><LeaderIcon category={cat?.key} />{cat?.label}</h3>
         <button className="btn ghost sm" onClick={() => open({ kind: 'leaderboard', category })}>All →</button>
       </div>
       {!entries?.length ? <Empty>No data yet.</Empty> : entries.slice(0, limit).map((e, i) => {

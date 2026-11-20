@@ -1,10 +1,12 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { initials } from '../lib/format';
 import { copyPng, downloadPng } from '../lib/exportImage';
-import { BRAND } from '../lib/config';
+import { BRAND, FEATURES } from '../lib/config';
+import { imageSrc } from '../lib/images';
 import { errMsg } from '../lib/format';
 import type { Team } from '../lib/types';
 import { ASIA, OCEANIA, findCountry } from '../lib/countries';
+import { Copy, Download, X, type LucideIcon } from 'lucide-react';
 
 // ---------- Section header: eyebrow + two-tone title with italic accent word ----------
 export function SectionHeader({ eyebrow, title, accent, link, linkLabel = 'View all →', right }: {
@@ -23,8 +25,14 @@ export function SectionHeader({ eyebrow, title, accent, link, linkLabel = 'View 
 }
 
 /** Full-width band in the brand colour at the top of every main page. Render it before <main className="page">. */
-export function PageHeader({ eyebrow, title, accent, titleAfter, right, children }: {
-  eyebrow?: ReactNode; title: string; accent?: string; titleAfter?: ReactNode; right?: ReactNode; children?: ReactNode;
+export function PageHeader({ eyebrow, title, accent, titleAfter, subtitle, meta, right, footer, children }: {
+  eyebrow?: ReactNode; title: string; accent?: string; titleAfter?: ReactNode; subtitle?: ReactNode;
+  /** Plain-text details stacked under the title (no display font). */
+  meta?: ReactNode;
+  right?: ReactNode;
+  /** A full-width row under the header content, starting at its left edge. */
+  footer?: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <header className="page-header">
@@ -33,8 +41,11 @@ export function PageHeader({ eyebrow, title, accent, titleAfter, right, children
         <div className="grow" style={{ minWidth: 0 }}>
           {eyebrow && <div className="eyebrow">{eyebrow}</div>}
           <h1 className="title">{title}{accent && <> <em>{accent}</em></>}{titleAfter}</h1>
+          {subtitle && <div className="page-header-sub">{subtitle}</div>}
+          {meta && <div className="page-header-meta">{meta}</div>}
         </div>
         {right}
+        {footer && <div className="page-header-footer">{footer}</div>}
       </div>
     </header>
   );
@@ -44,27 +55,49 @@ export function StatCard({ value, label }: { value: ReactNode; label: string }) 
   return <div className="stat-card"><div className="big num">{value}</div><div className="label">{label}</div></div>;
 }
 
-export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { key: T; label: string; emoji?: string }[]; active: T; onChange: (k: T) => void }) {
+export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { key: T; label: string; icon?: LucideIcon }[]; active: T; onChange: (k: T) => void }) {
   return (
     <div className="tabs" role="tablist">
       {tabs.map((t) => (
         <button key={t.key} role="tab" aria-selected={active === t.key} className={`tab ${active === t.key ? 'active' : ''}`} onClick={() => onChange(t.key)}>
-          {t.emoji && <span aria-hidden>{t.emoji} </span>}{t.label}
+          {t.icon && <t.icon size={15} aria-hidden />}{t.label}
         </button>
       ))}
     </div>
   );
 }
 
-export function Crest({ team, size = '' }: { team?: Team | null; size?: '' | 'sm' | 'lg' }) {
-  if (!team) return <span className={`crest ${size}`} style={{ background: 'var(--surface-2)' }}>?</span>;
-  if (team.crestUrl) return <img className={`crest ${size}`} src={team.crestUrl} alt="" style={{ background: team.color }} loading="lazy" />;
-  return <span className={`crest ${size}`} style={{ background: team.color || 'var(--accent)' }}>{(team.shortName || initials(team.name)).slice(0, 3)}</span>;
+/** Black or white text, whichever reads better on this background colour (#rrggbb). */
+export function textOn(hex?: string | null): '#000' | '#fff' {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return '#fff';
+  const lin = (i: number) => { const c = parseInt(m[1].slice(i, i + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+  // Above ~0.18 relative luminance, black text has more contrast than white.
+  return L > 0.179 ? '#000' : '#fff';
 }
 
-export function TeamChip({ team }: { team?: Team | null }) {
+export function Crest({ team, size = '' }: { team?: Team | null; size?: '' | 'sm' | 'lg' }) {
+  if (!team) return <span className={`crest ${size}`} style={{ background: 'var(--surface-2)' }}>?</span>;
+  // Discord attachment links expire after ~24 h; imageSrc() routes them through the Worker, which re-signs them.
+  if (team.crestUrl) return <img className={`crest logo ${size}`} src={imageSrc(team.crestUrl)} alt="" loading="lazy" />;
+  const text = (team.shortName || initials(team.name)).slice(0, 4);
+  // Four letters get a slightly smaller font so they still fit the badge.
+  return <span className={`crest ${size}${text.length > 3 ? ' long' : ''}`} style={{ background: team.color || 'var(--accent)', color: textOn(team.color) }}>{text}</span>;
+}
+
+/** Team crest/logo. `named` adds the abbreviation in a team-coloured pill; `link` makes it open the team page. */
+export function TeamChip({ team, link, named }: { team?: Team | null; link?: boolean; named?: boolean }) {
   if (!team) return <span className="team-chip muted">Free agent</span>;
-  return <span className="team-chip" style={{ boxShadow: `inset 3px 0 0 ${team.color}` }}><Crest team={team} size="sm" />{team.shortName || team.name}</span>;
+  // link: the chip opens the team page (and doesn't trigger a clickable row underneath).
+  if (link) return <a className="team-chip-link" href={`#team/${encodeURIComponent(team.id)}`} onClick={(e) => e.stopPropagation()}><TeamChip team={team} named={named} /></a>;
+  // Logo (or crest badge) sits outside; only the name pill takes the team colour, with black or white text by brightness.
+  return (
+    <span className="team-chip-wrap">
+      <Crest team={team} size="sm" />
+      {named && <span className="team-chip" style={team.color ? { background: team.color, color: textOn(team.color) } : undefined}>{team.shortName || team.name}</span>}
+    </span>
+  );
 }
 
 export function FormPills({ form }: { form: string[] }) {
@@ -110,7 +143,7 @@ export function Modal({ onClose, children, wide }: { onClose: () => void; childr
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal onClick={(e) => e.stopPropagation()}>
-        <button className="icon-btn modal-close" onClick={onClose} aria-label="Close">✕</button>
+        <button className="icon-btn modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
         {children}
       </div>
     </div>
@@ -159,10 +192,12 @@ export function ExportCard({ title, filename, children }: { title: string; filen
   const { run, busy } = useAction();
   return (
     <div>
-      <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
-        <button className="btn sm" disabled={busy} onClick={() => run(() => copyPng(ref.current!), 'Copied image to clipboard')}>📋 Copy as PNG</button>
-        <button className="btn sm" disabled={busy} onClick={() => run(() => downloadPng(ref.current!, filename))}>⬇️ Download PNG</button>
-      </div>
+      {FEATURES.imageExport && (
+        <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button className="btn sm" disabled={busy} onClick={() => run(() => copyPng(ref.current!), 'Copied image to clipboard')}><Copy size={14} aria-hidden />Copy as PNG</button>
+          <button className="btn sm" disabled={busy} onClick={() => run(() => downloadPng(ref.current!, filename))}><Download size={14} aria-hidden />Download PNG</button>
+        </div>
+      )}
       <div ref={ref} className="export-card">
         <div className="export-head">
           <img src={BRAND.logo} alt="" />

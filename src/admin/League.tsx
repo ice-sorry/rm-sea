@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { collection, doc, getDocs, serverTimestamp, arrayRemove, arrayUnion } from 'firebase/firestore';
+import { collection, doc, getDocs, serverTimestamp, arrayRemove, arrayUnion, query, where, limit } from 'firebase/firestore';
 import { addDoc, deleteDoc, setDoc, updateDoc, writeBatch } from '../lib/db';
 import { call, db } from '../lib/firebase';
 import { useLeague } from '../lib/league';
 import { SectionHeader, Empty, Crest, Field, useAction, Confirm, Avatar, TeamChip, Flag, CountrySelect } from '../components/ui';
 import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Position, Team, Player } from '../lib/types';
-import { actor, normalizeTeamName, syncTeamRoles } from './util';
+import { actor, normalizeTeamName, notifyNewTeam, notifyRosterMove, syncTeamRoles } from './util';
+import { normalizeImageLink } from '../lib/images';
+import { Check, RefreshCw } from 'lucide-react';
 
 // ======================= Teams =======================
 const blankTeam = { name: '', shortName: '', color: '#1D8ADE', crestUrl: '', discordRoleId: '', captainIds: [] as string[], active: true };
@@ -19,13 +21,43 @@ export function AdminTeams() {
     const e = edit!;
     const data = {
       name: e.name.trim(), shortName: (e.shortName || e.name.slice(0, 4)).trim().toUpperCase(), nameNormalized: normalizeTeamName(e.name),
-      color: e.color, crestUrl: e.crestUrl, discordRoleId: e.discordRoleId || null, captainIds: e.captainIds, active: e.active,
+      color: e.color, crestUrl: e.crestUrl ? normalizeImageLink(e.crestUrl) : '', discordRoleId: e.discordRoleId || null, captainIds: e.captainIds, active: e.active,
     };
     if (e.id) await updateDoc(doc(db, 'teams', e.id), data);
-    else await addDoc(collection(db, 'teams'), { ...data, mergedInto: null });
+    else {
+      const ref = await addDoc(collection(db, 'teams'), { ...data, mergedInto: null });
+      if (data.active) await notifyNewTeam(ref.id);
+    }
     setEdit(null);
   }, 'Team saved');
   const roster = edit?.id ? (L.rosters[edit.id] || []) : [];
+  // Only clubs with no history can go: deleting one with results or awards would leave them pointing at nothing.
+  const removeTeam = (id: string, name: string) => run(async () => {
+    const seasonIds = L.seasons.map((x) => x.id);
+    const cupIds = (await getDocs(collection(db, 'cups'))).docs.map((d) => d.id);
+    const has = (path: string, field: string) => getDocs(query(collection(db, path), where(field, '==', id), limit(1))).then((x) => !x.empty);
+    const checks = await Promise.all([
+      ...[...seasonIds.map((x) => `seasons/${x}/matches`), ...cupIds.map((c) => `cups/${c}/matches`)].flatMap((m) => [has(m, 'homeTeamId'), has(m, 'awayTeamId')]),
+      ...seasonIds.map((x) => has(`seasons/${x}/awards`, 'recipientId')),
+    ]);
+    if (checks.some(Boolean)) throw new Error(`${name} has matches or awards on record, so it can't be deleted. Untick Active to hide it, or merge it into another team (Admin → System → Merge duplicates).`);
+    const [members, pending] = await Promise.all([
+      getDocs(query(collection(db, 'players'), where('currentTeamId', '==', id))),
+      getDocs(query(collection(db, 'requests'), where('status', '==', 'pending'))),
+    ]);
+    // 1. Release the players and clear the club from every season, while the team doc still exists so the
+    //    role sync below can read its Discord role and take it off the former members.
+    const b = writeBatch(db);
+    seasonIds.forEach((x) => { b.delete(doc(db, `seasons/${x}/rosters/${id}`)); b.delete(doc(db, `seasons/${x}/entries/${id}`)); });
+    members.docs.forEach((d) => b.update(d.ref, { currentTeamId: null, updatedAt: serverTimestamp() }));
+    pending.docs.filter((d) => d.data().toTeamId === id || d.data().teamId === id)
+      .forEach((d) => b.update(d.ref, { status: 'declined', decidedBy: actor(), decidedAt: serverTimestamp(), message: `${d.data().message || ''} (team deleted)`.trim() }));
+    await b.commit();
+    await syncTeamRoles(id);
+    // 2. Then the team itself.
+    await deleteDoc(doc(db, 'teams', id));
+    setEdit(null);
+  }, `${name} deleted`);
 
   return (
     <>
@@ -53,7 +85,10 @@ export function AdminTeams() {
               ))}{!roster.length && <span className="small muted">Add players to the roster first.</span>}</div>
             </Field>
           )}
-          <div className="row"><button className="btn primary" disabled={busy || edit.name.trim().length < 2} onClick={save}>Save</button><button className="btn ghost" onClick={() => setEdit(null)}>Cancel</button></div>
+          <div className="row">
+            <button className="btn primary" disabled={busy || edit.name.trim().length < 2} onClick={save}>Save</button><button className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
+            {edit.id && <><span className="grow" /><Confirm text={`Delete ${edit.name}? Its players become free agents and it's removed from every season. This can't be undone. Teams with matches or awards can't be deleted.`} onYes={() => removeTeam(edit.id!, edit.name)}>Delete team</Confirm></>}
+          </div>
         </div>
       )}
       <div className="card flush table-wrap">
@@ -66,7 +101,7 @@ export function AdminTeams() {
               <td className="small muted">{t.discordRoleId || '—'}</td>
               <td className="small">{(t.captainIds || []).map((c) => L.players[c]?.name).join(', ') || '—'}</td>
               <td>{(L.rosters[t.id] || []).length}</td>
-              <td>{t.active !== false ? '✅' : '—'}</td>
+              <td>{t.active !== false ? <Check size={16} aria-label="Active" /> : '—'}</td>
               <td className="right"><button className="btn sm" onClick={() => setEdit({ ...blankTeam, ...t, discordRoleId: t.discordRoleId || '', captainIds: t.captainIds || [] })}>Edit</button></td>
             </tr>
           ))}</tbody>
@@ -102,7 +137,7 @@ export function AdminPlayers() {
   return (
     <>
       <SectionHeader eyebrow="League" title="Players" accent="& Discord links"
-        right={<button className="btn sm" disabled={busy} onClick={() => run(() => call<unknown, { checked: number; updated: number }>('refreshAvatars')({}), (r) => `Checked ${r.checked}, updated ${r.updated} avatars`)}>🔄 Refresh avatars</button>} />
+        right={<button className="btn sm" disabled={busy} onClick={() => run(() => call<unknown, { checked: number; updated: number }>('refreshAvatars')({}), (r) => `Checked ${r.checked}, updated ${r.updated} avatars`)}><RefreshCw size={15} aria-hidden />Refresh avatars</button>} />
       <div className="card stack">
         <h3>+ Add player</h3>
         <div className="form-grid">
@@ -111,7 +146,7 @@ export function AdminPlayers() {
           <Field label="Team"><select className="select" value={form.teamId} onChange={(e) => setForm({ ...form, teamId: e.target.value })}><option value="">Free agent</option>{L.teamList.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></Field>
           <Field label="Position"><select className="select" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value as Position })}>{POSITIONS.map((p) => <option key={p} value={p}>{POSITION_LABELS[p]}</option>)}</select></Field>
         </div>
-        <button className="btn primary" disabled={busy || form.name.trim().length < 2} onClick={addPlayer}>Add player</button>
+        <button className="btn primary" disabled={busy || form.name.trim().length < 1} onClick={addPlayer}>Add player</button>
       </div>
       {edit && (
         <div className="card stack">
@@ -175,6 +210,7 @@ export function AdminRosters() {
     if (isCurrent) b.update(doc(db, 'players', pid), { currentTeamId: teamId, updatedAt: serverTimestamp() });
     await b.commit();
     await syncTeamRoles(other, teamId);
+    if (isCurrent) await notifyRosterMove({ playerId: pid, fromTeamId: other || null, toTeamId: teamId });
     setAdd('');
   }, 'Added to roster');
   const remove = (pid: string) => run(async () => {
@@ -183,6 +219,7 @@ export function AdminRosters() {
     if (isCurrent) b.update(doc(db, 'players', pid), { currentTeamId: null, updatedAt: serverTimestamp() });
     await b.commit();
     await syncTeamRoles(teamId);
+    if (isCurrent) await notifyRosterMove({ playerId: pid, fromTeamId: teamId, toTeamId: null, removed: true });
   }, 'Removed');
   const copy = () => run(async () => {
     const src = await getDocs(collection(db, `seasons/${copyFrom}/rosters`));

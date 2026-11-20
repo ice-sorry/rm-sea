@@ -1,4 +1,4 @@
-import { useLeague } from '../lib/league';
+import { rosterLimit, useLeague } from '../lib/league';
 import { Crest, Avatar, StatCard, Empty, FormPills, PageHeader, Flag } from '../components/ui';
 import { JoinTeamButton, CaptainPanel } from '../components/player';
 import { ResultCard, FixtureCard } from '../components/league';
@@ -27,6 +27,7 @@ export default function TeamPage({ id }: { id: string }) {
   const results = ms.filter((m) => m.status === 'played').sort((a, b) => b.round - a.round).slice(0, 6);
   const upcoming = ms.filter((m) => m.status !== 'played' && m.status !== 'void').sort((a, b) => a.round - b.round).slice(0, 6);
   const isCaptain = L.isAdmin || (!!L.myPlayer && !!t.captainIds?.includes(L.myPlayer.id));
+  const cap = rosterLimit(L.general);
   const stat = (pid: string) => L.playerStats?.rows.find((r) => r.playerId === pid);
 
   return (
@@ -34,6 +35,7 @@ export default function TeamPage({ id }: { id: string }) {
       <PageHeader
         eyebrow={row ? <>{L.season?.name} · {ordinal(row.pos)} · {row.pts} pts</> : L.season?.name || 'Team'}
         title={t.name}
+        subtitle={t.shortName || undefined}
         right={<span className="row wrap">{row && <FormPills form={row.form} />}<JoinTeamButton teamId={id} /></span>}>
         <Crest team={t} size="lg" />
       </PageHeader>
@@ -57,7 +59,7 @@ export default function TeamPage({ id }: { id: string }) {
             </section>
           </div>
           <aside className="home-side card">
-            <h3>Roster{seasonRoster && L.season ? ` · ${L.season.name}` : ''}</h3>
+            <h3>Roster{seasonRoster && L.season ? ` · ${L.season.name}` : ''}{cap > 0 && <span className="small muted" style={{ fontWeight: 400 }}> · {roster.length} / {cap}</span>}</h3>
             {!roster.length ? <Empty>No roster registered.</Empty> : roster.map((p) => (
               <div key={p.id} className="leader" style={{ gridTemplateColumns: '28px 1fr auto' }} onClick={() => open({ kind: 'player', id: p.id })}>
                 <Avatar src={p.avatarUrl} name={p.name} />

@@ -6,16 +6,17 @@ import { useDoc, go } from '../lib/hooks';
 import { PageHeader, Tabs, Empty, Crest, TeamChip, Avatar, Skeleton, Flag } from '../components/ui';
 import { LeaderList, LineChart, ResultCard } from '../components/league';
 import { useModal } from '../modals/ModalContext';
-import { pct } from '../lib/format';
+import { pct, signed } from '../lib/format';
 import { LEADER_CATEGORIES, STAT_KEYS, STAT_LABELS, gamePoints } from '../lib/types';
-import type { MatchDoc, PlayerStatRow, RecordsDoc } from '../lib/types';
+import type { MatchDoc, PlayerStatRow, RecordsDoc, TeamStatRow } from '../lib/types';
+import { Brain, ChartLine, Scale, Shield, Sparkles, Target, User, type LucideIcon } from 'lucide-react';
 
 type Tab = 'overview' | 'players' | 'teams' | 'h2h';
-const TABS: { key: Tab; label: string; emoji: string }[] = [
-  { key: 'overview', label: 'Overview', emoji: '✨' },
-  { key: 'players', label: 'Players', emoji: '👤' },
-  { key: 'teams', label: 'Teams', emoji: '🛡️' },
-  { key: 'h2h', label: 'H2H', emoji: '⚖️' },
+const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
+  { key: 'overview', label: 'Overview', icon: Sparkles },
+  { key: 'players', label: 'Players', icon: User },
+  { key: 'teams', label: 'Teams', icon: Shield },
+  { key: 'h2h', label: 'H2H', icon: Scale },
 ];
 
 export default function StatsPage({ sub }: { sub: string }) {
@@ -39,8 +40,8 @@ export default function StatsPage({ sub }: { sub: string }) {
 
 // ---------- Sortable table ----------
 export interface Col<T> { key: string; label: string; get: (r: T) => number | string | null; render?: (r: T) => ReactNode; num?: boolean; group?: string }
-export function SortTable<T>({ rows, cols, initial, onRow, rowKey }: { rows: T[]; cols: Col<T>[]; initial: string; onRow?: (r: T) => void; rowKey: (r: T) => string }) {
-  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: initial, dir: -1 });
+export function SortTable<T>({ rows, cols, initial, initialDir = -1, onRow, rowKey }: { rows: T[]; cols: Col<T>[]; initial: string; initialDir?: 1 | -1; onRow?: (r: T) => void; rowKey: (r: T) => string }) {
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: initial, dir: initialDir });
   const col = cols.find((c) => c.key === sort.key) || cols[0];
   const sorted = [...rows].sort((a, b) => {
     const x = col.get(a), y = col.get(b);
@@ -78,7 +79,7 @@ function usePlayerCols(): Col<PlayerStatRow>[] {
   const { players, teams } = useLeague();
   return [
     { key: 'name', label: 'Player', get: (r) => players[r.playerId]?.name || '', render: (r) => <span className="row"><Avatar src={players[r.playerId]?.avatarUrl} name={players[r.playerId]?.name} size="sm" />{players[r.playerId]?.name || 'Unknown'}<Flag country={players[r.playerId]?.country} /></span> },
-    { key: 'team', label: 'Team', get: (r) => (r.teamId ? teams[r.teamId]?.name : '') || '', render: (r) => <TeamChip team={r.teamId ? teams[r.teamId] : null} /> },
+    { key: 'team', label: 'Team', get: (r) => (r.teamId ? teams[r.teamId]?.name : '') || '', render: (r) => <TeamChip team={r.teamId ? teams[r.teamId] : null} link named /> },
     { key: 'gp', label: 'GP', get: (r) => r.gp, num: true },
     ...STAT_KEYS.map((k): Col<PlayerStatRow> => ({ key: k, label: STAT_LABELS[k], get: (r) => r[k] ?? 0, num: true })),
     { key: 'mvps', label: 'MVPs', get: (r) => r.mvps, num: true },
@@ -134,12 +135,12 @@ function Overview() {
         {LEADER_CATEGORIES.slice(0, 6).map((c) => <LeaderList key={c.key} category={c.key} entries={L.leaders?.categories?.[c.key]} />)}
       </div>
       <div className="card">
-        <h3>📈 Round-by-round race</h3>
+        <h3><ChartLine size={18} aria-hidden />Round-by-round race</h3>
         {race.rounds.length ? <LineChart series={race.series} maxY={race.maxY} xLabels={race.rounds.map((r) => `R${r}`)} /> : <Empty>No rounds played yet.</Empty>}
       </div>
       <div className="grid-2">
         <div className="card">
-          <h3>🎯 Record Watch</h3>
+          <h3><Target size={18} aria-hidden />Record Watch</h3>
           {!watch.length ? <Empty>Records appear after the first results.</Empty> : watch.map((w) => (
             <div key={w.label} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => open({ kind: 'player', id: w.chaser })}>
               <div className="row between small"><span className="muted">{w.label}</span><span>Record: <b>{w.record}</b> · {L.players[w.holder]?.name}{w.holderSeason ? ` (${w.holderSeason})` : ''}</span></div>
@@ -149,7 +150,7 @@ function Overview() {
           ))}
         </div>
         <div className="card">
-          <h3>⚖️ Per-game scaled <span className="small muted">(min {minGp} games)</span></h3>
+          <h3><Scale size={18} aria-hidden />Per-game scaled <span className="small muted">(min {minGp} games)</span></h3>
           {(['goals', 'assists', 'interceptions', 'saves'] as const).map((k) => (
             <div key={k} style={{ marginBottom: 8 }}>
               <div className="eyebrow">{STAT_LABELS[k]} per game</div>
@@ -160,7 +161,7 @@ function Overview() {
         </div>
       </div>
       <div className="card flush">
-        <div style={{ padding: 16, paddingBottom: 0 }}><h3>🧠 Advanced metrics</h3></div>
+        <div style={{ padding: 16, paddingBottom: 0 }}><h3><Brain size={18} aria-hidden />Advanced metrics</h3></div>
         <SortTable rows={qualified} initial="contrib" rowKey={(r) => r.playerId} onRow={(r) => open({ kind: 'player', id: r.playerId })} cols={[
           pcols[0],
           { key: 'contrib', label: 'G+A / game', get: (r) => r.adv.contribPg, num: true },
@@ -168,7 +169,7 @@ function Overview() {
           { key: 'mvpRate', label: 'MVP / series', get: (r) => r.adv.mvpRate, num: true },
         ]} />
       </div>
-      <div className="card flush"><div style={{ padding: 16, paddingBottom: 0 }}><h3>🛡️ Team stats</h3></div><TeamsTable /></div>
+      <div className="card flush"><div style={{ padding: 16, paddingBottom: 0 }}><h3><Shield size={18} aria-hidden />Team stats</h3></div><TeamsTable compact /></div>
       <div className="row"><a className="btn" href="#stats/players">Full player stats →</a><a className="btn" href="#stats/teams">Full team stats →</a></div>
     </div>
   );
@@ -201,13 +202,27 @@ function PlayersTab() {
   );
 }
 
-function TeamsTable() {
+/** Team stats table. `compact` (Statistics → Overview) shows only the headline columns. */
+function TeamsTable({ compact }: { compact?: boolean }) {
   const L = useLeague();
   const { open } = useModal();
   if (!L.teamStats) return <Skeleton />;
+  const team: Col<TeamStatRow> = { key: 'team', label: 'Team', get: (r) => L.teams[r.teamId]?.name || '', render: (r) => <span className="team-cell"><Crest team={L.teams[r.teamId]} size="sm" />{L.teams[r.teamId]?.name}</span> };
+  if (compact) {
+    return (
+      <SortTable rows={L.teamStats.rows} initial="gd" rowKey={(r) => r.teamId} onRow={(r) => open({ kind: 'team', id: r.teamId })} cols={[
+        team,
+        { key: 'games', label: 'Games played', get: (r) => r.games, num: true },
+        { key: 'goalsPg', label: 'Goals / game', get: (r) => r.goalsPg, render: (r) => r.goalsPg.toFixed(2), num: true },
+        { key: 'concededPg', label: 'Goals against / game', get: (r) => r.concededPg, render: (r) => r.concededPg.toFixed(2), num: true },
+        { key: 'gd', label: 'Goal difference', get: (r) => r.gf - r.ga, render: (r) => signed(r.gf - r.ga), num: true },
+        { key: 'cleanSheets', label: 'Clean sheets', get: (r) => r.cleanSheets, num: true },
+      ]} />
+    );
+  }
   return (
     <SortTable rows={L.teamStats.rows} initial="gf" rowKey={(r) => r.teamId} onRow={(r) => open({ kind: 'team', id: r.teamId })} cols={[
-      { key: 'team', label: 'Team', get: (r) => L.teams[r.teamId]?.name || '', render: (r) => <span className="team-cell"><Crest team={L.teams[r.teamId]} size="sm" />{L.teams[r.teamId]?.name}</span> },
+      team,
       { key: 'series', label: 'Series', get: (r) => r.series, num: true },
       { key: 'games', label: 'Games', get: (r) => r.games, num: true },
       { key: 'gw', label: 'GW', get: (r) => r.gw, num: true },
