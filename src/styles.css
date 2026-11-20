@@ -413,6 +413,11 @@ table.data thead tr.group-row th.group { color: var(--accent-2); box-shadow: ins
           rgba(0, 0, 0, 0.4), 
           rgba(0, 0, 0, 0.4)
         ); background-blend-mode: darken; }
+/* Smaller AVIF (~121 KB) or WebP (~150 KB) where supported; others keep the JPEG (~182 KB). Inside @supports
+   so browsers without typed image-set() never get a value that would drop the whole background. */
+@supports (background-image: image-set(url('/home/hero-bg.avif') type('image/avif'))) {
+  .home-hero { --hero-img: image-set(url('/home/hero-bg.avif') type('image/avif'), url('/home/hero-bg.webp') type('image/webp'), url('/home/hero-bg.jpg') type('image/jpeg')); }
+}
 .home-hero .page-header-inner { flex-direction: column; justify-content: center; text-align: center; gap: 0; min-height: 75vh; padding-top: var(--s8); padding-bottom: var(--s8); }
 .home-hero-logo { width: clamp(225px, 36vw, 420px); height: auto; margin-bottom: var(--s6); filter: drop-shadow(0 8px 24px rgba(0,0,0,.45)); }
 .home-hero .title { font-size: clamp(44px, 7vw, 88px); margin-bottom: 64px; text-shadow: 0 2px 16px rgba(0,0,0,.4); }
