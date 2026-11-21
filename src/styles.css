@@ -69,9 +69,16 @@ img { max-width: 100%; }
 .page-header .view-all, .page-header a { color: #fff; }
 @media (min-width: 900px) { .page-header-inner { min-height: 220px; padding: 56px var(--s6); } }
 .page-header .title .flag { margin-left: 12px; vertical-align: middle; }
-/* Team page: push the name/abbreviation block away from the crest. */
+/* Team page: a big crest/logo, with the name/abbreviation block pushed away from it. */
+.page-header-inner > .crest.lg { width: 88px; height: 88px; font-size: 30px; border-radius: 16px; }
+.page-header-inner > .crest.lg.long { font-size: 24px; }
+.page-header-inner > img.crest.logo { border-radius: 0 !important; }
 .page-header-inner > .crest + .grow { margin-left: var(--s3); }
-@media (min-width: 900px) { .page-header-inner > .crest + .grow { margin-left: var(--s5); } }
+@media (min-width: 900px) {
+  .page-header-inner > .crest.lg { width: 140px; height: 140px; font-size: 46px; border-radius: 24px; }
+  .page-header-inner > .crest.lg.long { font-size: 36px; }
+  .page-header-inner > .crest + .grow { margin-left: var(--s5); }
+}
 .page-header-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: var(--s2); color: rgba(255,255,255,.85); font-size: 15px; }
 .page-header-footer { flex-basis: 100%; margin-top: var(--s3); }
 .player-team { display: inline-flex; align-items: center; gap: var(--s3); font-family: var(--font-display); font-weight: 800; font-size: 24px; text-transform: uppercase; color: #fff; }
