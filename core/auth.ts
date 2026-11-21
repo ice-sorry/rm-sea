@@ -1,7 +1,7 @@
 import { onCall, HttpsError, logger, identity } from './runtime';
 import {
   db, FieldValue, requireAuth, roleOf, Role,
-  DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID, DISCORD_GUILD_ID, DISCORD_ADMIN_ROLE_IDS, ALLOWED_REDIRECTS, FIREBASE_PROJECT_ID,
+  DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID, DISCORD_GUILD_ID, adminRoleIdsFrom, ALLOWED_REDIRECTS, FIREBASE_PROJECT_ID,
 } from './admin';
 import { avatarUrl, discordApi } from './discord';
 
@@ -18,7 +18,7 @@ function allowedRedirects(): string[] {
 
 export async function computeClaims(uid: string, guildRoleIds: string[]): Promise<{ role: Role }> {
   const admins = ((await db.doc('settings/admins').get()).data() || {}) as { adminUids?: string[]; ownerUids?: string[]; adminRoleIds?: string[] };
-  const adminRoleIds = admins.adminRoleIds?.length ? admins.adminRoleIds : DISCORD_ADMIN_ROLE_IDS.value().split(',').map((s) => s.trim());
+  const adminRoleIds = adminRoleIdsFrom(admins);
   let role: Role = 'user';
   if ((admins.ownerUids || []).includes(uid)) role = 'owner';
   else if ((admins.adminUids || []).includes(uid) || guildRoleIds.some((r) => adminRoleIds.includes(r))) role = 'admin';

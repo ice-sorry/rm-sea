@@ -4,15 +4,15 @@ import { useMemo, useState } from 'react';
 import { collection, doc, serverTimestamp, where } from 'firebase/firestore';
 import { addDoc, updateDoc } from '../lib/db';
 import { call, db } from '../lib/firebase';
-import { rosterFull, useLeague } from '../lib/league';
+import { rosterFull, squadIds, useLeague } from '../lib/league';
 import { useCol, useDoc } from '../lib/hooks';
-import { SectionHeader, Empty, Crest, Avatar, Field, Flag, CountrySelect, useAction } from './ui';
+import { SectionHeader, Empty, Crest, Avatar, Field, Flag, CountrySelect, TeamChip, useAction } from './ui';
 import { SignInButton } from './Shell';
 import { fmtAgo, fmtDateTime, toLocalInput, ms } from '../lib/format';
 import { normalizeImageLink } from '../lib/images';
 import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Entry, MatchDoc, Position, RequestDoc } from '../lib/types';
-import { Bell, CircleCheck, Palette, Clock, DoorOpen, Inbox, Landmark, Lock, Pencil, Repeat, UserMinus, UserPlus, Users } from 'lucide-react';
+import { Bell, CircleCheck, Palette, Clock, DoorOpen, Inbox, Landmark, Lock, Mail, Pencil, Repeat, UserMinus, UserPlus, Users } from 'lucide-react';
 
 // ---------- Own profile: edit ----------
 export function ProfileEditor() {
@@ -72,8 +72,54 @@ export function requestLabel(r: RequestDoc, teamName = '?', seasonName = 'the se
     case 'transfer': return `Transfer → ${teamName}`;
     case 'leave_team': return `Leave ${teamName}`;
     case 'kick_player': return `Remove a player from ${teamName}`;
+    case 'team_invite': return `Invite to ${teamName}`;
     default: return `Join → ${teamName}`;
   }
+}
+
+/** Pending team invites sent to the signed-in player. */
+function useMyInvites() {
+  const L = useLeague();
+  const pid = L.myPlayer?.id;
+  // One-field query (no composite index); the type/status filter runs here.
+  const { data } = useCol<RequestDoc>(pid ? 'requests' : null, where('playerId', '==', pid || '-'));
+  return data.filter((r) => r.type === 'team_invite' && r.status === 'pending');
+}
+
+/** Accept / decline buttons for an invite (the invited player answers it). */
+function InviteAnswer({ r }: { r: RequestDoc }) {
+  const L = useLeague();
+  const { run, busy } = useAction();
+  const team = L.teams[r.toTeamId || ''];
+  const leaving = L.myPlayer?.currentTeamId && L.myPlayer.currentTeamId !== r.toTeamId ? L.teams[L.myPlayer.currentTeamId] : null;
+  return (
+    <span className="row" style={{ gap: 6 }}>
+      <button className="btn sm primary" disabled={busy} onClick={() => {
+        if (leaving && !window.confirm(`Accepting moves you from ${leaving.name} to ${team?.name}. Continue?`)) return;
+        run(() => call('decideRequest')({ requestId: r.id, decision: 'accept' }), `Welcome to ${team?.name || 'the team'}`);
+      }}>Accept</button>
+      <button className="btn sm" disabled={busy} onClick={() => run(() => call('decideRequest')({ requestId: r.id, decision: 'decline' }), 'Invite declined')}>Decline</button>
+    </span>
+  );
+}
+
+// ---------- Own profile: invites from captains ----------
+export function MyInvites() {
+  const L = useLeague();
+  const invites = useMyInvites();
+  if (!invites.length) return null;
+  return (
+    <section className="card">
+      <h3><Mail size={18} aria-hidden />Team invites</h3>
+      {[...invites].sort((a, b) => ms(b.createdAt) - ms(a.createdAt)).map((r) => (
+        <div key={r.id} className="row wrap" style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+          <TeamChip team={L.teams[r.toTeamId || '']} link />
+          <span className="grow small"><a href={`#team/${encodeURIComponent(r.toTeamId || '')}`}>{L.teams[r.toTeamId || '']?.name || 'A team'}</a> invited you{r.message ? <> · <span className="muted">{r.message}</span></> : ''}<br /><span className="muted">{fmtAgo(r.createdAt)}</span></span>
+          <InviteAnswer r={r} />
+        </div>
+      ))}
+    </section>
+  );
 }
 
 // ---------- Team page: ask to join ----------
@@ -85,10 +131,12 @@ export function JoinTeamButton({ teamId }: { teamId: string }) {
   const [openForm, setOpen] = useState(false);
   const [message, setMessage] = useState('');
   const { data: mine } = useCol<RequestDoc>(L.authUser ? 'requests' : null, where('requestedBy', '==', L.authUser?.uid || '-'));
+  const invite = useMyInvites().find((r) => r.toTeamId === teamId);
   if (team?.active === false) return null;
   if (!L.authUser) return <SignInButton />;
   if (!p) return <a className="btn" href="#me"><UserPlus size={15} aria-hidden />Set up my player</a>;
   if (p.currentTeamId === teamId) return <LeaveTeamButton teamId={teamId} pending={mine.find((r) => r.status === 'pending' && r.type === 'leave_team' && r.teamId === teamId)} />;
+  if (invite) return <span className="row wrap"><span className="badge ok" style={{ fontSize: 13, padding: '6px 12px' }}><Mail size={13} aria-hidden />You're invited</span><InviteAnswer r={invite} /></span>;
   const pending = mine.find((r) => r.status === 'pending' && r.toTeamId === teamId);
   if (pending) return <span className="badge warn" style={{ fontSize: 13, padding: '6px 12px' }}>Request pending</span>;
   if (L.general.transfersBlocked) return <span className="badge" style={{ fontSize: 13, padding: '6px 12px' }} title="An admin has closed the transfer window"><Lock size={13} aria-hidden />Transfers closed</span>;
@@ -99,10 +147,12 @@ export function JoinTeamButton({ teamId }: { teamId: string }) {
     <span className="row wrap">
       <input className="input" style={{ maxWidth: 260 }} placeholder="Message to the captain (optional)" value={message} maxLength={200} onChange={(e) => setMessage(e.target.value)} />
       <button className="btn primary" disabled={busy} onClick={() => run(async () => {
-        await addDoc(collection(db, 'requests'), {
+        const ref = await addDoc(collection(db, 'requests'), {
           type: transfer ? 'transfer' : 'join_team', playerId: p.id, fromTeamId: p.currentTeamId, toTeamId: teamId,
           seasonId: L.general.currentSeasonId || null, status: 'pending', message, requestedBy: L.authUser!.uid, createdAt: serverTimestamp(),
         });
+        // DMs the captains (when Player DMs are on). Best-effort: the request is already saved.
+        await call('notifyRequest')({ requestId: ref.id }).catch(() => undefined);
         setOpen(false); setMessage('');
       }, 'Request sent')}>Send</button>
       <button className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
@@ -169,7 +219,9 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
   const { run, busy } = useAction();
   const { data: joins } = useCol<RequestDoc>('requests', where('toTeamId', '==', teamId), where('status', '==', 'pending'));
   const { data: teamReqs } = useCol<RequestDoc>('requests', where('teamId', '==', teamId), where('status', '==', 'pending'));
-  const reqs = [...joins, ...teamReqs.filter((r) => r.type === 'leave_team')];
+  // Invites the team sent wait on the player, so they're listed in the invite card instead.
+  const reqs = [...joins.filter((r) => r.type !== 'team_invite'), ...teamReqs.filter((r) => r.type === 'leave_team')];
+  const invites = joins.filter((r) => r.type === 'team_invite');
   const full = rosterFull(L, teamId);
   const fixtures = useMemo(() => L.matches.filter((m) => (m.homeTeamId === teamId || m.awayTeamId === teamId) && ['scheduled', 'agreed'].includes(m.status)).sort((a, b) => a.round - b.round).slice(0, 6), [L.matches, teamId]);
   return (
@@ -178,6 +230,7 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
       <SeasonEntryCard teamId={teamId} />
       <TeamIdentityCard teamId={teamId} />
       <SquadCard teamId={teamId} />
+      <InviteCard teamId={teamId} invites={invites} />
       <div className="grid-2">
         <div className="card">
           <h3><Bell size={18} aria-hidden />Player requests</h3>
@@ -206,6 +259,61 @@ export function CaptainPanel({ teamId }: { teamId: string }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// ---------- Team page: invite players (captains and admins) ----------
+function InviteCard({ teamId, invites }: { teamId: string; invites: RequestDoc[] }) {
+  const L = useLeague();
+  const team = L.teams[teamId];
+  const { run, busy } = useAction();
+  const [q, setQ] = useState('');
+  const [message, setMessage] = useState('');
+  const closed = !!L.general.transfersBlocked && !L.isAdmin;
+  const full = rosterFull(L, teamId);
+  const squad = new Set(squadIds(L, teamId));
+  const invited = new Set(invites.map((r) => r.playerId));
+  const captains = new Set(Object.values(L.teams).flatMap((t) => t.captainIds || []));
+  const term = q.trim().toLowerCase();
+  // Only players who have signed in can answer an invite; other teams' captains can't be moved by request.
+  const matches = term.length < 2 ? [] : L.playerList
+    .filter((p) => p.name.toLowerCase().includes(term) && !squad.has(p.id) && p.ownerUid && !captains.has(p.id))
+    .slice(0, 8);
+  const blocked = closed ? 'Transfers are closed' : full ? 'Roster full: remove a player first' : undefined;
+  return (
+    <div className="card stack" style={{ marginBottom: 'var(--s4)' }}>
+      <h3 style={{ margin: 0 }}><Mail size={18} aria-hidden />Invite players</h3>
+      <div className="row wrap">
+        <input className="input" style={{ maxWidth: 260 }} placeholder="Search players by name" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="input" style={{ maxWidth: 300 }} placeholder="Message to the player (optional)" value={message} maxLength={200} onChange={(e) => setMessage(e.target.value)} />
+      </div>
+      {term.length >= 2 && !matches.length && <span className="small muted">No players found who can be invited.</span>}
+      {matches.map((p) => (
+        <div key={p.id} className="row" style={{ padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+          <Avatar src={p.avatarUrl} name={p.name} size="sm" />
+          <span className="grow">{p.name}<Flag country={p.country} /><br /><span className="small muted">{POSITION_LABELS[p.position]} · {p.currentTeamId ? L.teams[p.currentTeamId]?.name || 'another team' : 'free agent'}</span></span>
+          {invited.has(p.id) ? <span className="badge warn">Invited</span> : (
+            <button className="btn sm primary" disabled={busy || !!blocked} title={blocked}
+              onClick={() => run(() => call('invitePlayer')({ teamId, playerId: p.id, message }), `Invite sent to ${p.name}`)}>
+              <UserPlus size={14} aria-hidden />Invite
+            </button>
+          )}
+        </div>
+      ))}
+      {invites.length > 0 && (
+        <div>
+          <div className="eyebrow" style={{ marginTop: 'var(--s2)' }}>Waiting for an answer</div>
+          {invites.map((r) => (
+            <div key={r.id} className="row" style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+              <Avatar src={L.players[r.playerId]?.avatarUrl} name={L.players[r.playerId]?.name} size="sm" />
+              <span className="grow">{L.players[r.playerId]?.name}<Flag country={L.players[r.playerId]?.country} /><br /><span className="small muted">invited {fmtAgo(r.createdAt)}{r.message ? ` · ${r.message}` : ''}</span></span>
+              <button className="btn sm ghost" disabled={busy} onClick={() => run(() => call('decideRequest')({ requestId: r.id, decision: 'cancel' }), 'Invite cancelled')}>Cancel</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="small muted" style={{ margin: 0 }}>{closed ? "Transfers are closed, so players can't be invited right now." : `The player accepts or declines the invite from their profile or ${team?.name || 'the team'}'s page. A player on another team transfers when they accept.`}</p>
+    </div>
   );
 }
 
@@ -322,7 +430,7 @@ function SeasonEntryCard({ teamId }: { teamId: string }) {
       type, teamId, playerId: L.myPlayer!.id, fromTeamId: null, toTeamId: null, seasonId,
       status: 'pending', message, requestedBy: L.authUser!.uid, createdAt: serverTimestamp(),
     });
-    await call('notifyAdminRequest')({ requestId: ref.id }).catch(() => undefined);
+    await call('notifyRequest')({ requestId: ref.id }).catch(() => undefined);
     setMessage('');
   }, 'Request sent to the admins');
   return (

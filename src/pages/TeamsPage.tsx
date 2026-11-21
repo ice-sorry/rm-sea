@@ -96,7 +96,7 @@ function CreateTeam({ onDone }: { onDone: () => void }) {
                 status: 'pending', message: f.message, teamName: f.name.trim(), shortName: f.shortName || f.name.trim().slice(0, 4).toUpperCase(), color: f.color, requestedBy: L.authUser!.uid, createdAt: serverTimestamp(),
               });
               // Best effort: a failed Discord post doesn't undo the request.
-              await call('notifyAdminRequest')({ requestId: ref.id }).catch(() => undefined);
+              await call('notifyRequest')({ requestId: ref.id }).catch(() => undefined);
               onDone();
             }, 'Request sent. Track it on your profile.')}>Request new club</button>
             <button className="btn ghost" onClick={onDone}>Cancel</button>
