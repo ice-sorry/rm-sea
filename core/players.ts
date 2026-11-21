@@ -1,6 +1,6 @@
-import { onCall, HttpsError, invoke, CallableRequest } from './runtime';
-import { db, FieldValue, requireAuth, requireAdmin, roleOf, currentSeasonId, getSettings, discordAllowed, DISCORD_BOT_TOKEN, DISCORD_GUILD_ID, auditNote } from './admin';
-import { avatarUrl, discordApi } from './discord';
+import { onCall, HttpsError, invoke, logger, CallableRequest } from './runtime';
+import { db, FieldValue, requireAuth, requireAdmin, roleOf, currentSeasonId, getSettings, discordAllowed, adminRoleIds, DISCORD_BOT_TOKEN, DISCORD_GUILD_ID, auditNote } from './admin';
+import { avatarUrl, discordApi, sendDm } from './discord';
 import { POSITIONS, Position, TRANSFER_LOG_STATUSES } from './shared/league';
 
 const isAdminReq = (req: CallableRequest) => ['admin', 'owner'].includes(roleOf(req));
@@ -261,29 +261,91 @@ async function postAdminRequest(requestId: string): Promise<boolean> {
     : ['🚫 Removal request', `${who} has been put forward for removal from ${teamName}.`, team.color];
   const message = String(r.message || '').trim();
   const site = String(general.siteUrl || '').replace(/\/+$/, '');
+  // Ping the admin roles so the alert gets seen. The bot needs "Mention @everyone, @here and All Roles", or the
+  // roles must be set to "Allow anyone to @mention this role", for the ping to go through.
+  const roles = await adminRoleIds();
   await discordApi(token, 'POST', `/channels/${channelId}/messages`, {
+    ...(roles.length ? { content: roles.map((id) => `<@&${id}>`).join(' ') } : {}),
     embeds: [{
       title, color: embedColor(color),
       description: `${description}${message ? `\n> ${message.replace(/\n/g, ' ')}` : ''}\nApprove or decline it in Admin → Moves → Requests.`,
       ...(site ? { url: `${site}/#admin/moves` } : {}),
       timestamp: new Date().toISOString(),
     }],
-    allowed_mentions: { parse: [] },
+    // Only the admin roles may ping; player handles in the embed stay silent.
+    allowed_mentions: { parse: [], roles },
   });
   await ref.update({ adminNotifiedAt: FieldValue.serverTimestamp() });
   return true;
 }
 
-/** Requester (or an admin): announce a request they just made that needs an admin's approval. */
-export const notifyAdminRequest = onCall(async (req) => {
+/**
+ * Best-effort Discord DM to each player (by player ID), when Player DMs are on in Admin → Settings → Discord & roles.
+ * Players who block DMs from server members, or have no linked Discord account, are skipped. Returns how many were sent.
+ */
+async function dmPlayers(playerIds: string[], embed: Record<string, unknown>): Promise<number> {
+  const ids = [...new Set(playerIds.filter(Boolean))].slice(0, 5); // keeps the Worker under its subrequest cap
+  const token = DISCORD_BOT_TOKEN.value();
+  if (!ids.length || !token || !discordAllowed(await getSettings('integrations'), 'playerDms')) return 0;
+  const players = await db.getAll(...ids.map((id) => db.doc(`players/${id}`)));
+  let sent = 0;
+  for (const p of players) {
+    const discordId = p.data()?.discordId as string | undefined;
+    if (!discordId) continue;
+    try {
+      await sendDm(token, discordId, { embeds: [{ ...embed, timestamp: new Date().toISOString() }], allowed_mentions: { parse: [] } });
+      sent++;
+    } catch (e) {
+      logger.warn('player DM failed', { playerId: p.id, error: String(e) });
+    }
+  }
+  return sent;
+}
+
+const siteUrl = async () => String((await getSettings<{ siteUrl?: string }>('general')).siteUrl || '').replace(/\/+$/, '');
+
+/** DM the captains of the team a player asked to join (or transfer to). Each request is sent once (captainsNotifiedAt). */
+async function dmCaptainsAboutJoin(requestId: string): Promise<number> {
+  const ref = db.doc(`requests/${requestId}`);
+  const r = (await ref.get()).data();
+  if (!r || r.status !== 'pending' || r.captainsNotifiedAt || !['join_team', 'transfer'].includes(r.type) || !r.toTeamId) return 0;
+  const paths = [`teams/${r.toTeamId}`, `players/${r.playerId}`, ...(r.fromTeamId ? [`teams/${r.fromTeamId}`] : [])];
+  const [team, player, from] = (await db.getAll(...paths.map((x) => db.doc(x)))).map((s) => s.data() || {});
+  const captainIds: string[] = (team.captainIds || []).filter((c: string) => c !== r.playerId);
+  if (!captainIds.length) return 0;
+  // Mark first, so a retried call can't DM the captains twice.
+  await ref.update({ captainsNotifiedAt: FieldValue.serverTimestamp() });
+  const site = await siteUrl();
+  const message = String(r.message || '').trim();
+  return dmPlayers(captainIds, {
+    title: r.type === 'transfer' ? '🔁 Transfer request' : '📨 Join request',
+    description: `**${player.name || 'A player'}**${r.type === 'transfer' ? ` (from **${from?.name || 'another team'}**)` : ''} wants to join **${team.name || 'your team'}**.`
+      + `${message ? `\n> ${message.replace(/\n/g, ' ')}` : ''}\nAccept or decline it in the captain tools on your team page.`,
+    color: embedColor(team.color),
+    ...(site ? { url: `${site}/#team/${encodeURIComponent(r.toTeamId)}` } : {}),
+    ...(player.avatarUrl ? { thumbnail: { url: player.avatarUrl } } : {}),
+  });
+}
+
+/**
+ * Requester (or an admin): announce a request they just made. Admin-only requests are posted to the alerts
+ * channel; join and transfer requests are DMed to the team's captains.
+ */
+export const notifyRequest = onCall(async (req) => {
   const uid = requireAuth(req);
   const requestId = String(req.data?.requestId || '');
   if (!requestId) throw new HttpsError('invalid-argument', 'requestId is required.');
   const snap = await db.doc(`requests/${requestId}`).get();
   if (!snap.exists) throw new HttpsError('not-found', 'Request not found.');
   if (snap.data()!.requestedBy !== uid && !isAdminReq(req)) throw new HttpsError('permission-denied', 'Only the requester can announce this request.');
-  return { posted: await postAdminRequest(requestId) };
+  const [posted, dmed] = await Promise.all([
+    postAdminRequest(requestId).catch((e) => { logger.warn('admin alert failed', String(e)); return false; }),
+    dmCaptainsAboutJoin(requestId).catch((e) => { logger.warn('captain DM failed', String(e)); return 0; }),
+  ]);
+  return { posted, dmed };
 });
+/** Older name, kept so browsers still running the previous build keep working. */
+export const notifyAdminRequest = notifyRequest;
 
 /** True when the player is on this team: on its season roster, or (between seasons / club not entered) by currentTeamId. */
 async function isOnTeam(seasonId: string | null, playerId: string, teamId: string) {
@@ -339,6 +401,55 @@ export const kickPlayer = onCall(async (req) => {
   return { requested: true };
 });
 
+/** True when this player captains a team (captains can't leave or be moved by requests; an admin changes captains first). */
+async function captainsATeam(playerId: string) {
+  return !(await db.collection('teams').where('captainIds', 'array-contains', playerId).limit(1).get()).empty;
+}
+
+/**
+ * Captain (or admin): invite a player to the team. The invite is a pending 'team_invite' request that the
+ * invited player accepts or declines; the inviting captains can cancel it. Accepting follows the same rules
+ * as a join request (transfer window, roster limit).
+ */
+export const invitePlayer = onCall(async (req) => {
+  const uid = requireAuth(req);
+  const { teamId, playerId } = (req.data || {}) as { teamId?: string; playerId?: string };
+  if (!teamId || !playerId) throw new HttpsError('invalid-argument', 'teamId and playerId are required.');
+  const [me, team, player] = await db.getAll(db.doc(`users/${uid}`), db.doc(`teams/${teamId}`), db.doc(`players/${playerId}`));
+  if (!team.exists || team.data()!.active === false) throw new HttpsError('not-found', 'Team not found.');
+  if (!player.exists || player.data()!.mergedInto) throw new HttpsError('not-found', 'Player not found.');
+  const captainIds: string[] = team.data()!.captainIds || [];
+  const admin = isAdminReq(req);
+  if (!admin && !(me.data()?.playerId && captainIds.includes(me.data()!.playerId))) throw new HttpsError('permission-denied', "Only this team's captain can invite players.");
+  if (!admin && (await transfersBlocked())) throw new HttpsError('failed-precondition', 'Transfers are closed right now.');
+  const p = player.data()!;
+  if (!p.ownerUid) throw new HttpsError('failed-precondition', `${p.name} hasn't signed in to the site yet, so they can't accept an invite.`);
+  const seasonId = await currentSeasonId();
+  if (await isOnTeam(seasonId, playerId, teamId)) throw new HttpsError('failed-precondition', `${p.name} is already on this team.`);
+  if (await captainsATeam(playerId)) throw new HttpsError('failed-precondition', `${p.name} captains another team. An admin has to change that team's captains first.`);
+  const cap = await maxRosterSize();
+  if (cap && (await squadSize(seasonId, teamId)) >= cap) throw new HttpsError('failed-precondition', `Your roster is full (${cap} players). Remove a player before inviting new ones.`);
+  const pending = (await db.collection('requests').where('playerId', '==', playerId).where('status', '==', 'pending').get()).docs;
+  if (pending.some((d) => d.data()!.type === 'team_invite' && d.data()!.toTeamId === teamId)) throw new HttpsError('already-exists', `${p.name} already has an invite from this team.`);
+  const message = String(req.data?.message || '').trim().slice(0, 200);
+  const added = await db.collection('requests').add({
+    type: 'team_invite', teamId, playerId, fromTeamId: (p.currentTeamId as string) || null, toTeamId: teamId, seasonId: seasonId || null,
+    status: 'pending', message, requestedBy: uid, createdAt: FieldValue.serverTimestamp(),
+  });
+  const t = team.data()!;
+  const site = await siteUrl();
+  const dmed = await dmPlayers([playerId], {
+    title: '✉️ Team invite',
+    description: `**${t.name}** has invited you to join the team.${message ? `\n> ${message.replace(/\n/g, ' ')}` : ''}`
+      + '\nAccept or decline it on your profile or the team page.',
+    color: embedColor(t.color),
+    ...(site ? { url: `${site}/#team/${encodeURIComponent(teamId)}` } : {}),
+    ...(t.crestUrl ? { thumbnail: { url: t.crestUrl } } : {}),
+  }).catch(() => 0);
+  if (dmed) await added.update({ playerNotifiedAt: FieldValue.serverTimestamp() }).catch(() => undefined);
+  return { invited: true, dmed: dmed > 0 };
+});
+
 /** Admin mid-season transfer. Runs in the admin's browser. */
 export const transferPlayer = onCall(async (req) => {
   const uid = requireAdmin(req);
@@ -352,7 +463,10 @@ export const transferPlayer = onCall(async (req) => {
   return r;
 });
 
-/** Accept/decline (admin or captain of the receiving team) or cancel (requester). */
+/**
+ * Accept/decline (admin or captain of the receiving team; for a team invite, the invited player) or cancel
+ * (requester; for a team invite, any captain of the inviting team).
+ */
 export const decideRequest = onCall(async (req) => {
   const uid = requireAuth(req);
   const { requestId, decision } = req.data as { requestId: string; decision: 'accept' | 'decline' | 'cancel' };
@@ -361,24 +475,32 @@ export const decideRequest = onCall(async (req) => {
   if (!snap.exists) throw new HttpsError('not-found', 'Request not found.');
   const r = snap.data()!;
   if (r.status !== 'pending') throw new HttpsError('failed-precondition', 'Request already decided.');
+  const invite = r.type === 'team_invite';
+  const myPlayerId = async () => ((await db.doc(`users/${uid}`).get()).data()?.playerId as string) || null;
+  const captainOf = async (teamId: string | null) => {
+    if (!teamId) return false;
+    const [pid, team] = await Promise.all([myPlayerId(), db.doc(`teams/${teamId}`).get()]);
+    return !!pid && (team.data()?.captainIds || []).includes(pid);
+  };
 
   if (decision === 'cancel') {
-    if (r.requestedBy !== uid) throw new HttpsError('permission-denied', 'Only the requester can cancel.');
+    if (r.requestedBy !== uid && !(invite && await captainOf(r.toTeamId))) throw new HttpsError('permission-denied', 'Only the requester can cancel.');
     await ref.update({ status: 'cancelled', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
     return { status: 'cancelled' };
   }
 
   const seasonRequest = r.type === 'join_season' || r.type === 'leave_season';
   let allowed = isAdminReq(req);
-  // Season entry/exit is admin-only; captains decide join/transfer requests for their own team.
-  const captainTeamId: string | null = r.type === 'leave_team' ? r.teamId || null : r.toTeamId || null;
   // Removals a captain asked for need an admin.
   const adminOnly = seasonRequest || r.type === 'kick_player';
-  if (!allowed && !adminOnly && captainTeamId && r.type !== 'new_team') {
-    const [me, team] = await db.getAll(db.doc(`users/${uid}`), db.doc(`teams/${captainTeamId}`));
-    allowed = !!me.data()?.playerId && (team.data()?.captainIds || []).includes(me.data()!.playerId);
+  if (!allowed && invite) {
+    // Only the invited player answers an invite; the captains who sent it can only cancel it.
+    allowed = (await myPlayerId()) === r.playerId;
+  } else if (!allowed && !adminOnly && r.type !== 'new_team') {
+    // Season entry/exit is admin-only; captains decide join/transfer requests for their own team.
+    allowed = await captainOf(r.type === 'leave_team' ? r.teamId || null : r.toTeamId || null);
   }
-  if (!allowed) throw new HttpsError('permission-denied', adminOnly ? 'Only admins can decide this request.' : 'Only admins or the team captain can decide this.');
+  if (!allowed) throw new HttpsError('permission-denied', adminOnly ? 'Only admins can decide this request.' : invite ? 'Only the invited player can answer this invite.' : 'Only admins or the team captain can decide this.');
 
   if (decision === 'decline') {
     await ref.update({ status: 'declined', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
@@ -433,6 +555,8 @@ export const decideRequest = onCall(async (req) => {
     if (kick) await auditNote(uid, `Removed ${r.playerId} from ${r.teamId} (requested by ${r.requestedBy})`, `players/${r.playerId}`);
     return { status: 'accepted' };
   }
+  // The invited player may have been made a captain since; moving them would leave that team without one.
+  if (invite && (await captainsATeam(r.playerId))) throw new HttpsError('failed-precondition', "Captains can't move to another team. An admin has to change the captains first.");
   // A full squad can't take new players through requests (admins can still move players directly).
   const cap = await maxRosterSize();
   if (cap && r.toTeamId && (await squadSize(seasonId, r.toTeamId)) >= cap) {
@@ -446,6 +570,10 @@ export const decideRequest = onCall(async (req) => {
     await p.ref.update({ currentTeamId: r.toTeamId, updatedAt: FieldValue.serverTimestamp() });
   }
   await ref.update({ status: 'accepted', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
+  // A join request and an invite for the same player and team are the same move: once one is accepted, close the rest.
+  const dupes = await db.collection('requests').where('playerId', '==', r.playerId).where('status', '==', 'pending').get();
+  await Promise.all(dupes.docs.filter((d) => d.id !== requestId && ['join_team', 'transfer', 'team_invite'].includes(d.data()!.type) && d.data()!.toTeamId === r.toTeamId)
+    .map((d) => d.ref.update({ status: 'cancelled', decidedBy: uid, decidedAt: FieldValue.serverTimestamp() })));
   await syncRolesFor([moved.fromTeamId, moved.toTeamId]);
   await announceMoves([{ playerId: r.playerId, ...moved }]);
   return { status: 'accepted' };

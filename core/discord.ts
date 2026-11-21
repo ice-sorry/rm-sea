@@ -24,6 +24,15 @@ export async function discordApi<T = unknown>(token: string, method: string, pat
   return (await res.json()) as T;
 }
 
+/**
+ * Direct message a Discord user from the bot. Throws when it can't be delivered (the user blocks DMs from
+ * server members, has left the server, or the bot token is missing); callers treat DMs as best-effort.
+ */
+export async function sendDm(token: string, userId: string, message: unknown): Promise<void> {
+  const channel = await discordApi<{ id: string }>(token, 'POST', '/users/@me/channels', { recipient_id: userId });
+  await discordApi(token, 'POST', `/channels/${channel.id}/messages`, message);
+}
+
 /** Webhook helpers. URL form: https://discord.com/api/webhooks/{id}/{token} */
 export async function webhookPost(url: string, payload: unknown): Promise<{ id: string } | null> {
   if (!url) return null;

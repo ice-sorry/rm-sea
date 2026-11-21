@@ -37,7 +37,7 @@ export async function getSettings<T = Record<string, any>>(id: string): Promise<
   return (s.data() || {}) as T;
 }
 /** Discord switches in Admin → Settings → Discord & roles (settings/integrations). A missing field counts as on. */
-export type DiscordFeature = 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads';
+export type DiscordFeature = 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads' | 'playerDms';
 export function discordAllowed(integ: Record<string, unknown>, feature?: DiscordFeature): boolean {
   return integ.discordEnabled !== false && (!feature || integ[feature] !== false);
 }
@@ -53,6 +53,14 @@ export async function requireDiscordOn(feature?: DiscordFeature) {
 export async function getPrivateDiscord(): Promise<Record<string, string>> {
   const s = await db.doc('private/discord').get();
   return (s.data() || {}) as Record<string, string>;
+}
+/** Discord role IDs that make a member an admin (Admin → Settings → Admins, else the DISCORD_ADMIN_ROLE_IDS default). */
+export function adminRoleIdsFrom(admins: { adminRoleIds?: string[] }): string[] {
+  const ids = admins.adminRoleIds?.length ? admins.adminRoleIds : DISCORD_ADMIN_ROLE_IDS.value().split(',');
+  return ids.map((s) => String(s).trim()).filter((s) => /^\d+$/.test(s));
+}
+export async function adminRoleIds(): Promise<string[]> {
+  return adminRoleIdsFrom(await getSettings<{ adminRoleIds?: string[] }>('admins'));
 }
 export async function currentSeasonId(): Promise<string | null> {
   const g = await getSettings<{ currentSeasonId?: string }>('general');

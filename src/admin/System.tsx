@@ -72,11 +72,12 @@ function Discord() {
   const { run, busy } = useAction();
   const [f, setF] = useSettingsForm('settings/integrations', {
     guildId: '1562776724431831050', matchReportChannelId: '', alertsChannelId: '', rosterChannelId: '', autoPost: true, autoPostOnEdit: false,
-    discordEnabled: true, rosterPosts: true, requestPosts: true, roleSync: true, matchThreads: true,
+    discordEnabled: true, rosterPosts: true, requestPosts: true, roleSync: true, matchThreads: true, playerDms: true,
   });
+  type Switch = 'discordEnabled' | 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads' | 'playerDms';
   // Older settings docs lack the switches; a missing switch counts as on (the Worker reads it the same way).
-  const on = (k: 'discordEnabled' | 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads') => f[k] !== false;
-  const toggle = (k: 'discordEnabled' | 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads', label: string, hint: string) => (
+  const on = (k: Switch) => f[k] !== false;
+  const toggle = (k: Switch, label: string, hint: string) => (
     <label className="check" title={hint}><input type="checkbox" disabled={k !== 'discordEnabled' && !on('discordEnabled')} checked={on(k)} onChange={(e) => setF({ ...f, [k]: e.target.checked })} />{label}</label>
   );
   const text = (k: keyof typeof f, label: string) => <Field label={label}><input className="input" value={String(f[k] ?? '')} onChange={(e) => setF({ ...f, [k]: e.target.value.trim() })} /></Field>;
@@ -87,7 +88,8 @@ function Discord() {
         <div className="row wrap">{toggle('discordEnabled', 'Discord on', 'Master switch: off stops every bot post, role change and webhook')}</div>
         <div className="row wrap">
           {toggle('rosterPosts', 'Roster move posts', 'Post when a player signs for or leaves a team, or a new team is created')}
-          {toggle('requestPosts', 'Admin request posts', 'Post when someone makes a request only an admin can approve: a new club, a season entry or exit, or a removal')}
+          {toggle('requestPosts', 'Admin request posts', 'Post when someone makes a request only an admin can approve: a new club, a season entry or exit, or a removal. The admin roles are mentioned.')}
+          {toggle('playerDms', 'Player DMs', 'Message players privately when a captain invites them, and message captains when someone asks to join their team')}
           {toggle('roleSync', 'Team role sync', 'Give and remove team roles when rosters change')}
           {toggle('matchThreads', 'Matchweek threads', 'Create and rename fixture threads')}
           <label className="check"><input type="checkbox" disabled={!on('discordEnabled')} checked={!!f.autoPost} onChange={(e) => setF({ ...f, autoPost: e.target.checked })} />Auto-post results</label>
@@ -100,7 +102,7 @@ function Discord() {
         <div className="form-grid">
           {text('guildId', 'Guild (server) ID')}{text('matchReportChannelId', 'Match report channel ID')}{text('alertsChannelId', 'Alerts channel ID')}{text('rosterChannelId', 'Roster moves channel ID')}
         </div>
-        <p className="small muted" style={{ margin: 0 }}>Roster moves: the bot posts there when a player signs for or leaves a team, or a new team is created. Alerts: the bot posts there when someone asks for a new club, a season entry or exit, or a player's removal, so an admin can approve it. Leave a channel blank to turn its posts off. The bot needs Send Messages and Embed Links in those channels.</p>
+        <p className="small muted" style={{ margin: 0 }}>Roster moves: the bot posts there when a player signs for or leaves a team, or a new team is created. Alerts: the bot posts there when someone asks for a new club, a season entry or exit, or a player's removal, so an admin can approve it, and mentions the admin roles from Settings → Admins. For the mention to ping, give the bot "Mention @everyone, @here and All Roles" or make those roles mentionable. Leave a channel blank to turn its posts off. The bot needs Send Messages and Embed Links in those channels.</p>
         <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/integrations'), f, { merge: true }), 'Saved')}>Save</button>
       </div>
       <div className="card row wrap">

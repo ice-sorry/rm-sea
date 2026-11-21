@@ -4,7 +4,7 @@ import { db } from '../lib/firebase';
 import { useLeague } from '../lib/league';
 import { useDoc } from '../lib/hooks';
 import { Avatar, Crest, TeamChip, StatCard, Empty, PageHeader, Flag } from '../components/ui';
-import { ProfileEditor, MyRequests, WrappedViewer } from '../components/player';
+import { ProfileEditor, MyRequests, MyInvites, WrappedViewer } from '../components/player';
 import { findCountry } from '../lib/countries';
 import { useModal, playerHref, teamHref } from '../modals/ModalContext';
 import { pct, ms } from '../lib/format';
@@ -73,6 +73,7 @@ export default function PlayerPage({ id }: { id: string }) {
       </PageHeader>
       <main className="page">
         {p.bio && <p style={{ margin: 0 }}>{p.bio}</p>}
+        {isMe && <MyInvites />}
         {isMe && <ProfileEditor />}
         {held.length > 0 && <div className="row wrap">{held.map((r) => <span key={r.key} className="badge warn"><ScrollText size={12} aria-hidden />{r.label}: {r.value}</span>)}</div>}
 
