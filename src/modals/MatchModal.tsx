@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { syncPublicDocs } from '../lib/db';
 import { useLeague } from '../lib/league';
 import { useDoc } from '../lib/hooks';
 import { Crest, Avatar, Empty, Skeleton, Flag, useAction } from '../components/ui';
@@ -49,7 +50,8 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
   const shots = m.gameScreenshots || {};
   // Free plan: no Cloud Storage, so screenshots are links (e.g. right-click → Copy link on a Discord attachment).
   const saveShot = (n: number, link: string) => run(
-    () => updateDoc(doc(db, path), { [`gameScreenshots.${n}`]: normalizeImageLink(link) }),
+    // This write doesn't go through lib/db, so copy the change into the season's match-list summary here.
+    async () => { await updateDoc(doc(db, path), { [`gameScreenshots.${n}`]: normalizeImageLink(link) }); await syncPublicDocs([path]); },
     shots[n] ? `Game ${n} screenshot replaced` : `Game ${n} screenshot added`,
   );
   // Before a result exists there are no games yet: offer a slot for every game the series format allows.

@@ -2,7 +2,7 @@ import { onCall, logger, invoke } from './runtime';
 import type { QuerySnapshot, WriteBatch } from './firestore';
 import { db, FieldValue, getSettings, getPrivateDiscord, discordAllowed, requireAdmin } from './admin';
 import { webhookPost } from './discord';
-import { rebuildPublic } from './public';
+import { rebuildPublic, writeSummary } from './public';
 import {
   Bracket, BracketSlot, Entry, Match, Season, DEFAULT_SEASON, summarizeSeries, computeStandings, computePlayerStats,
   computeTeamStats, computeLeaders, recomputeBracket, matchweekOf, stageForRoundKey, PlayerStatRow, StandingRow,
@@ -14,12 +14,28 @@ export async function loadSeason(seasonId: string): Promise<Season> {
   const s = await db.doc(`seasons/${seasonId}`).get();
   return { ...DEFAULT_SEASON, id: seasonId, number: 0, name: seasonId, ...(s.data() as Partial<Season>) } as Season;
 }
+/** Every team's name, from the derived/teams summary (1 read) when it's built, otherwise from the collection. */
 export async function teamNames(): Promise<Record<string, string>> {
+  const sum = (await db.doc('derived/teams').get()).data();
+  if (sum?.items && !sum.overflow) {
+    return Object.fromEntries(Object.entries(sum.items as Record<string, { name?: string }>).map(([id, t]) => [id, t?.name || '']));
+  }
   const t = await db.collection('teams').get();
   return Object.fromEntries(t.docs.map((d) => [d.id, d.data()!.name as string]));
 }
 
-/** Recompute every derived doc for a season from its matches. */
+/** Every season ID, from the derived/seasons summary when it's built, sorted like the collection. */
+async function seasonIds(): Promise<string[]> {
+  const sum = (await db.doc('derived/seasons').get()).data();
+  if (sum?.items && !sum.overflow) return Object.keys(sum.items).sort();
+  return (await db.collection('seasons').get()).docs.map((d) => d.id);
+}
+
+/**
+ * Recompute every derived doc for a season from its matches. Also rewrites the season's match-list summary and
+ * its record candidates, so the records job doesn't need to read every match again. Returns what it read, so
+ * callers can pass it on instead of re-reading.
+ */
 export async function recomputeSeason(seasonId: string) {
   const [season, entriesSnap, matchesSnap, names] = await Promise.all([
     loadSeason(seasonId),
@@ -50,55 +66,47 @@ export async function recomputeSeason(seasonId: string) {
       goals: played.reduce((s, m) => s + (m.goalsHome || 0) + (m.goalsAway || 0), 0),
     },
   });
+  const candidates = matchRecordCandidates(matches, seasonId, true);
+  batch.set(db.doc(`${base}/records`), { candidates, computedAt: now });
   await batch.commit();
-  return { rows, playerRows };
+  // The match list the site reads (core/public.ts). Rewriting it here also creates it and repairs any missed sync.
+  await writeSummary(`${base}/matchList`, { items: Object.fromEntries(matchesSnap.docs.map((d) => [d.id, d.data()])) });
+  return { rows, playerRows, matches, candidates };
 }
 
 // ---------- Records ----------
 export interface CareerStats { goals: number; assists: number; gp: number; mvps: number; saves: number; interceptions: number; passes: number; seasons: number }
 interface RecordEntry { key: string; label: string; value: number; holderType: 'player' | 'team'; holderId: string; seasonId: string | null; matchId: string | null }
+type Best = (key: string, label: string, holderType: 'player' | 'team', cand: Omit<RecordEntry, 'key' | 'label' | 'holderType'>) => void;
 
-export async function recomputeRecords() {
-  const [seasonsSnap, allMatches] = await Promise.all([db.collection('seasons').get(), db.collectionGroup('matches').get()]);
-  const records: RecordEntry[] = [];
-  const best = (key: string, label: string, holderType: 'player' | 'team', cand: Omit<RecordEntry, 'key' | 'label' | 'holderType'>) => {
+/** Keeps the highest value per record key; on a tie the first one found stays. */
+function recordKeeper(records: RecordEntry[]): Best {
+  return (key, label, holderType, cand) => {
     const cur = records.find((r) => r.key === key);
     if (!cur) records.push({ key, label, holderType, ...cand });
     else if (cand.value > cur.value) Object.assign(cur, cand);
   };
-  const career = new Map<string, CareerStats>();
-  const derivedSnaps = await db.getAll(...seasonsSnap.docs.flatMap((s) => [db.doc(`seasons/${s.id}/derived/playerStats`), db.doc(`seasons/${s.id}/derived/standings`)]));
-  seasonsSnap.docs.forEach((s, i) => {
-    const ps = derivedSnaps[i * 2], st = derivedSnaps[i * 2 + 1];
-    for (const r of (ps.data()?.rows || []) as PlayerStatRow[]) {
-      best('season_goals', 'Most goals in a season', 'player', { value: r.goals, holderId: r.playerId, seasonId: s.id, matchId: null });
-      best('season_assists', 'Most assists in a season', 'player', { value: r.assists, holderId: r.playerId, seasonId: s.id, matchId: null });
-      best('season_saves', 'Most saves in a season', 'player', { value: r.saves, holderId: r.playerId, seasonId: s.id, matchId: null });
-      best('season_mvps', 'Most MVPs in a season', 'player', { value: r.mvps, holderId: r.playerId, seasonId: s.id, matchId: null });
-      best('season_interceptions', 'Most interceptions in a season', 'player', { value: r.interceptions || 0, holderId: r.playerId, seasonId: s.id, matchId: null });
-      const c = career.get(r.playerId) || { goals: 0, assists: 0, gp: 0, mvps: 0, saves: 0, interceptions: 0, passes: 0, seasons: 0 };
-      c.goals += r.goals; c.assists += r.assists; c.gp += r.gp; c.mvps += r.mvps; c.saves += r.saves;
-      c.interceptions += r.interceptions || 0; c.passes += r.passes || 0; c.seasons += 1;
-      career.set(r.playerId, c);
-    }
-    for (const r of (st.data()?.rows || []) as StandingRow[]) {
-      best('season_points', 'Most points in a season', 'team', { value: r.pts, holderId: r.teamId, seasonId: s.id, matchId: null });
-      best('season_gd', 'Best goal difference in a season', 'team', { value: r.gd, holderId: r.teamId, seasonId: s.id, matchId: null });
-    }
-    // Longest series win streak within a season
-    const ms = allMatches.docs.filter((d) => d.ref.parent.parent?.id === s.id && d.ref.parent.parent?.parent.id === 'seasons')
-      .map((d) => ({ id: d.id, ...d.data() }) as Match).filter((m) => m.status === 'played' && m.stage === 'league').sort((a, b) => a.round - b.round);
+}
+
+/**
+ * The best match-level records (game goals/saves, biggest win, series goals and, for seasons, the league win
+ * streak) among these matches. Stored per season and per cup so the records job reads a few small documents
+ * instead of every match ever played.
+ */
+function matchRecordCandidates(matches: Match[], seasonId: string | null, withStreaks: boolean): RecordEntry[] {
+  const out: RecordEntry[] = [];
+  const best = recordKeeper(out);
+  if (withStreaks) {
+    const league = matches.filter((m) => m.status === 'played' && m.stage === 'league').sort((a, b) => a.round - b.round);
     const streak = new Map<string, number>();
-    for (const m of ms) for (const t of [m.homeTeamId, m.awayTeamId]) {
+    for (const m of league) for (const t of [m.homeTeamId, m.awayTeamId]) {
       const n = m.winnerTeamId === t ? (streak.get(t) || 0) + 1 : 0;
       streak.set(t, n);
-      best('win_streak', 'Longest win streak', 'team', { value: n, holderId: t, seasonId: s.id, matchId: m.id });
+      best('win_streak', 'Longest win streak', 'team', { value: n, holderId: t, seasonId, matchId: m.id });
     }
-  });
-  for (const d of allMatches.docs) {
-    const m = { id: d.id, ...d.data() } as Match;
+  }
+  for (const m of matches) {
     if (m.status !== 'played') continue;
-    const seasonId = d.ref.parent.parent?.parent.id === 'seasons' ? d.ref.parent.parent!.id : null;
     for (const g of m.games || []) {
       for (const [pid, s] of Object.entries(g.playerStats || {})) {
         best('game_goals', 'Most goals in a game', 'player', { value: s.goals || 0, holderId: pid, seasonId, matchId: m.id });
@@ -109,6 +117,84 @@ export async function recomputeRecords() {
     }
     best('series_goals', 'Most goals in a series', 'team', { value: m.goalsHome, holderId: m.homeTeamId, seasonId, matchId: m.id });
     best('series_goals', 'Most goals in a series', 'team', { value: m.goalsAway, holderId: m.awayTeamId, seasonId, matchId: m.id });
+  }
+  return out.filter((r) => r.value > 0);
+}
+
+/** Store a cup's record candidates in derived/cupRecords (one document for every cup). */
+async function saveCupCandidates(cupId: string, matches: Match[]) {
+  await db.doc('derived/cupRecords').set({ items: { [cupId]: matchRecordCandidates(matches, null, false) }, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+}
+
+/** Rebuild derived/cupRecords from every cup's matches. Only needed once, or from recomputeAll. */
+async function rebuildCupCandidates(): Promise<Record<string, RecordEntry[]>> {
+  const items: Record<string, RecordEntry[]> = {};
+  for (const c of (await db.collection('cups').get()).docs) {
+    items[c.id] = matchRecordCandidates(docsToMatches(await db.collection(`cups/${c.id}/matches`).get()), null, false);
+  }
+  // complete: every cup is in it, so later per-cup updates can merge into it.
+  await db.doc('derived/cupRecords').set({ items, complete: true, updatedAt: FieldValue.serverTimestamp() });
+  return items;
+}
+
+/** Fresh results for one season, passed in by a caller that just recomputed it (saves reading them back). */
+interface FreshSeason { seasonId: string; playerRows: PlayerStatRow[]; standingRows: StandingRow[]; candidates: RecordEntry[] }
+
+/**
+ * Records, milestones, career totals and each player's season-by-season line (derived/careers).
+ * Reads 3 small documents per season plus the cup candidates, instead of every match.
+ */
+export async function recomputeRecords(fresh?: FreshSeason, opts: { rebuildCups?: boolean } = {}) {
+  const ids = await seasonIds();
+  const others = ids.filter((s) => s !== fresh?.seasonId);
+  const [snaps, cupDoc, cupList] = await Promise.all([
+    db.getAll(...others.flatMap((s) => ['playerStats', 'standings', 'records'].map((d) => db.doc(`seasons/${s}/derived/${d}`)))),
+    opts.rebuildCups ? Promise.resolve(null) : db.doc('derived/cupRecords').get(),
+    db.collection('cups').get(),
+  ]);
+  const bySeason = new Map<string, { playerRows: PlayerStatRow[]; standingRows: StandingRow[]; candidates: RecordEntry[] }>();
+  for (const [i, s] of others.entries()) {
+    const [ps, st, rec] = snaps.slice(i * 3, i * 3 + 3);
+    let candidates = rec.data()?.candidates as RecordEntry[] | undefined;
+    if (!candidates) {
+      // Seasons recomputed before candidates existed: work them out once from the season's matches and keep them.
+      candidates = matchRecordCandidates(docsToMatches(await db.collection(`seasons/${s}/matches`).get()), s, true);
+      await db.doc(`seasons/${s}/derived/records`).set({ candidates, computedAt: FieldValue.serverTimestamp() });
+    }
+    bySeason.set(s, { playerRows: (ps.data()?.rows || []) as PlayerStatRow[], standingRows: (st.data()?.rows || []) as StandingRow[], candidates });
+  }
+  if (fresh) bySeason.set(fresh.seasonId, fresh);
+  const cupItems = (!opts.rebuildCups && cupDoc?.data()?.complete ? cupDoc.data()!.items : await rebuildCupCandidates()) as Record<string, RecordEntry[]>;
+  // A deleted cup's candidates may linger in derived/cupRecords; only count cups that still exist.
+  const liveCups = new Set(cupList.docs.map((d) => d.id));
+
+  const records: RecordEntry[] = [];
+  const best = recordKeeper(records);
+  const career = new Map<string, CareerStats>();
+  const history: Record<string, { s: string; t: string | null; gp: number; g: number; a: number; sv: number; m: number }[]> = {};
+  // Cup matches come first, as they did when every match was read in path order.
+  for (const [c, cands] of Object.entries(cupItems || {})) if (liveCups.has(c)) for (const r of cands || []) best(r.key, r.label, r.holderType, r);
+  for (const s of ids) {
+    const data = bySeason.get(s);
+    if (!data) continue;
+    for (const r of data.playerRows) {
+      best('season_goals', 'Most goals in a season', 'player', { value: r.goals, holderId: r.playerId, seasonId: s, matchId: null });
+      best('season_assists', 'Most assists in a season', 'player', { value: r.assists, holderId: r.playerId, seasonId: s, matchId: null });
+      best('season_saves', 'Most saves in a season', 'player', { value: r.saves, holderId: r.playerId, seasonId: s, matchId: null });
+      best('season_mvps', 'Most MVPs in a season', 'player', { value: r.mvps, holderId: r.playerId, seasonId: s, matchId: null });
+      best('season_interceptions', 'Most interceptions in a season', 'player', { value: r.interceptions || 0, holderId: r.playerId, seasonId: s, matchId: null });
+      const c = career.get(r.playerId) || { goals: 0, assists: 0, gp: 0, mvps: 0, saves: 0, interceptions: 0, passes: 0, seasons: 0 };
+      c.goals += r.goals; c.assists += r.assists; c.gp += r.gp; c.mvps += r.mvps; c.saves += r.saves;
+      c.interceptions += r.interceptions || 0; c.passes += r.passes || 0; c.seasons += 1;
+      career.set(r.playerId, c);
+      (history[r.playerId] ||= []).push({ s, t: r.teamId, gp: r.gp, g: r.goals, a: r.assists, sv: r.saves, m: r.mvps });
+    }
+    for (const r of data.standingRows) {
+      best('season_points', 'Most points in a season', 'team', { value: r.pts, holderId: r.teamId, seasonId: s, matchId: null });
+      best('season_gd', 'Best goal difference in a season', 'team', { value: r.gd, holderId: r.teamId, seasonId: s, matchId: null });
+    }
+    // Win streak and match-level records, worked out when the season was last recomputed.
+    for (const r of data.candidates) best(r.key, r.label, r.holderType, r);
   }
   for (const [pid, c] of career) {
     best('career_goals', 'All-time goals', 'player', { value: c.goals, holderId: pid, seasonId: null, matchId: null });
@@ -125,6 +211,8 @@ export async function recomputeRecords() {
     records: records.filter((r) => r.value > 0), milestones,
     career: Object.fromEntries(career), computedAt: FieldValue.serverTimestamp(),
   });
+  // Each player's season-by-season line for their profile: 1 read there instead of one per season.
+  await writeSummary('derived/careers', { players: history });
 }
 
 // ---------- Brackets ----------
@@ -134,11 +222,14 @@ function slotResult(matches: Match[], key: string) {
   return { winnerTeamId: m.winnerTeamId!, loserTeamId: m.winnerTeamId === m.homeTeamId ? m.awayTeamId : m.homeTeamId };
 }
 
-/** Recompute season brackets, propagate second-chance feeds, and keep slot matches in sync. */
-export async function recomputeSeasonBrackets(seasonId: string) {
-  const [bSnap, mSnap] = await Promise.all([db.collection(`seasons/${seasonId}/playoffs`).get(), db.collection(`seasons/${seasonId}/matches`).get()]);
+/**
+ * Recompute season brackets, propagate second-chance feeds, and keep slot matches in sync.
+ * Pass the season's matches when they were just read (recomputeSeason returns them) to skip reading them again.
+ */
+export async function recomputeSeasonBrackets(seasonId: string, seasonMatches?: Match[]) {
+  const bSnap = await db.collection(`seasons/${seasonId}/playoffs`).get();
   if (bSnap.empty) return;
-  const matches = docsToMatches(mSnap);
+  const matches = seasonMatches || docsToMatches(await db.collection(`seasons/${seasonId}/matches`).get());
   // The Finals Shield (second-chance bracket) was retired: drop it and any route into it.
   const batch0 = db.batch();
   const shield = bSnap.docs.find((d) => d.id === 'shield');
@@ -250,9 +341,10 @@ export const afterMatchWrite = onCall(async (req) => {
     if (fix) await ref.update(fix);
   }
   if (resultChanged) {
-    await recomputeSeason(seasonId);
-    await recomputeSeasonBrackets(seasonId);
-    await recomputeRecords();
+    // Read the season's matches once and pass them along; the records job reads per-season summaries, not matches.
+    const fresh = await recomputeSeason(seasonId);
+    await recomputeSeasonBrackets(seasonId, fresh.matches);
+    await recomputeRecords({ seasonId, playerRows: fresh.playerRows, standingRows: fresh.rows, candidates: fresh.candidates });
   }
   await invoke('matchSideEffects', { seasonId, matchId }).catch((e) => logger.warn('Discord side effects failed', e));
   return { ok: true };
@@ -283,7 +375,7 @@ export const matchSideEffects = onCall(async (req) => {
 async function postResult(seasonId: string, m: Match, edited: boolean) {
   const priv = await getPrivateDiscord();
   if (!priv.resultWebhookUrl) return;
-  const names = await teamNames();
+  const names = await teamNames(); // 1 read from the teams summary
   const general = await getSettings<{ siteUrl?: string; leagueName?: string }>('general');
   let mvp = '';
   if (m.mvpPlayerId) mvp = (await db.doc(`players/${m.mvpPlayerId}`).get()).data()?.name || '';
@@ -336,6 +428,8 @@ export const afterCupMatchWrite = onCall(async (req) => {
   const final = bracket.rounds[bracket.rounds.length - 1]?.slots[0];
   batch.update(cupRef, { bracket, championTeamId: final?.winnerTeamId || null });
   await batch.commit();
+  // Keep this cup's record candidates current (the records job reads them instead of every cup match).
+  await saveCupCandidates(c, ms).catch((e) => logger.warn('cup record candidates not saved', e));
   return { ok: true };
 });
 
@@ -344,9 +438,9 @@ export const recomputeAll = onCall(async (req) => {
   requireAdmin(req);
   const seasonId = req.data?.seasonId as string | undefined;
   const seasons = seasonId ? [seasonId] : (await db.collection('seasons').get()).docs.map((d) => d.id);
-  for (const s of seasons) { await recomputeSeason(s); await recomputeSeasonBrackets(s); }
-  await recomputeRecords();
-  // Also builds the public summaries the first time (derived/players, teams, seasons).
-  await rebuildPublic();
+  for (const s of seasons) { const r = await recomputeSeason(s); await recomputeSeasonBrackets(s, r.matches); }
+  await recomputeRecords(undefined, { rebuildCups: true });
+  // Also builds every public summary (players, teams, seasons, match lists, squads, awards) the first time.
+  await rebuildPublic(new Set(seasons)); // recomputeSeason has just rewritten those seasons' match lists
   return { seasons };
 });

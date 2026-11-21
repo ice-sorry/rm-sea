@@ -195,8 +195,9 @@ export const mergeEntities = onCall(async (req) => {
   }
   if (Object.keys(keepPatch).length) await db.doc(`${base}/${keepId}`).update(keepPatch);
 
-  for (const s of seasons.docs) { await recomputeSeason(s.id); await recomputeSeasonBrackets(s.id); }
-  await recomputeRecords();
+  for (const s of seasons.docs) { const r = await recomputeSeason(s.id); await recomputeSeasonBrackets(s.id, r.matches); }
+  // Cup matches were rewritten too, so their record candidates are rebuilt.
+  await recomputeRecords(undefined, { rebuildCups: true });
   await auditNote(uid, `Merged ${kind} ${removeId} into ${keepId} (${rewritten} docs rewritten, ${moved} moved)`, `${base}/${keepId}`);
   return { rewritten, moved };
 });
