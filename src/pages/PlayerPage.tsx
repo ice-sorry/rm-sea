@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 import { useLeague } from '../lib/league';
+import { loadCareer, useCached, type CareerLine } from '../lib/cache';
 import { useDoc } from '../lib/hooks';
 import { Avatar, Crest, TeamChip, StatCard, Empty, PageHeader, Flag } from '../components/ui';
 import { ProfileEditor, MyRequests, MyInvites, WrappedViewer } from '../components/player';
@@ -9,7 +7,7 @@ import { findCountry } from '../lib/countries';
 import { useModal, playerHref, teamHref } from '../modals/ModalContext';
 import { pct, ms } from '../lib/format';
 import { POSITION_LABELS } from '../lib/types';
-import type { PlayerStatRow, RecordsDoc } from '../lib/types';
+import type { RecordsDoc } from '../lib/types';
 import { Scale, ScrollText, Star } from 'lucide-react';
 
 export default function PlayerPage({ id }: { id: string }) {
@@ -20,14 +18,11 @@ export default function PlayerPage({ id }: { id: string }) {
   const isMe = !!L.myPlayer && L.myPlayer.id === id && !!L.authUser;
   const { data: wrapped } = useDoc<{ slides: { kind: string; title: string; value: string | number; caption: string }[] }>(isMe && L.seasonId ? `seasons/${L.seasonId}/wrapped/${id}` : null);
   const wrappedOpen = !!wrapped?.slides?.length && (L.season?.status === 'complete' || ms(L.season?.wrappedOpenUntil) > Date.now());
-  const [history, setHistory] = useState<{ seasonId: string; row: PlayerStatRow }[]>([]);
-  useEffect(() => {
-    Promise.all(L.seasons.map(async (s) => {
-      const d = await getDoc(doc(db, `seasons/${s.id}/derived/playerStats`));
-      const row = (d.data()?.rows as PlayerStatRow[] | undefined)?.find((r) => r.playerId === id);
-      return row ? { seasonId: s.id, row } : null;
-    })).then((x) => setHistory(x.filter(Boolean) as { seasonId: string; row: PlayerStatRow }[]));
-  }, [id, L.seasons]);
+  // Season-by-season line from derived/careers (1 read, cached for the session), newest season first.
+  const seasonIds = L.seasons.map((x) => x.id);
+  const ttl = L.isAdmin ? 0 : undefined;
+  const lines = useCached(`career|${id}|${seasonIds.join(',')}`, () => loadCareer(id, seasonIds, ttl), ttl) || [];
+  const history = seasonIds.map((sid) => lines.find((l) => l.s === sid)).filter((l): l is CareerLine => !!l);
 
   if (!p) {
     return (
@@ -102,9 +97,9 @@ export default function PlayerPage({ id }: { id: string }) {
             {!history.length ? <Empty>No seasons played yet.</Empty> : (
               <div className="table-wrap">
                 <table className="data"><thead><tr><th>Season</th><th>Team</th><th className="n">GP</th><th className="n">G</th><th className="n">A</th><th className="n">SV</th><th className="n">MVP</th></tr></thead>
-                  <tbody>{history.map(({ seasonId, row }) => (
-                    <tr key={seasonId}><td>{L.seasons.find((x) => x.id === seasonId)?.name}</td><td><TeamChip team={row.teamId ? L.teams[row.teamId] : null} /></td>
-                      <td className="n">{row.gp}</td><td className="n">{row.goals}</td><td className="n">{row.assists}</td><td className="n">{row.saves}</td><td className="n">{row.mvps}</td></tr>
+                  <tbody>{history.map((row) => (
+                    <tr key={row.s}><td>{L.seasons.find((x) => x.id === row.s)?.name}</td><td><TeamChip team={row.t ? L.teams[row.t] : null} /></td>
+                      <td className="n">{row.gp}</td><td className="n">{row.g}</td><td className="n">{row.a}</td><td className="n">{row.sv}</td><td className="n">{row.m}</td></tr>
                   ))}</tbody></table>
               </div>
             )}

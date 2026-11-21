@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useMemo, useState } from 'react';
 import { useLeague } from '../lib/league';
+import { useAllAwards } from '../lib/cache';
 import { PageHeader, Avatar, Flag, TeamChip, Skeleton, Empty } from '../components/ui';
 import { useModal } from '../modals/ModalContext';
 import { SortTable, Col } from './StatsPage';
@@ -16,16 +15,10 @@ interface Row { player: Player; awards: (Award & { seasonName: string })[] }
 export default function PlayersPage() {
   const L = useLeague();
   const { open } = useModal();
-  const [awards, setAwards] = useState<(Award & { seasonName: string })[]>([]);
+  const all = useAllAwards();
+  const awards = useMemo(() => (all || []).filter((a) => a.recipientType === 'player'), [all]);
   const [q, setQ] = useState('');
   const [team, setTeam] = useState('');
-
-  useEffect(() => {
-    Promise.all(L.seasons.map(async (s) => (await getDocs(collection(db, `seasons/${s.id}/awards`))).docs
-      .map((d) => ({ id: d.id, ...d.data(), seasonName: s.name }) as Award & { seasonName: string })))
-      .then((x) => setAwards(x.flat().filter((a) => a.recipientType === 'player')))
-      .catch(() => setAwards([]));
-  }, [L.seasons]);
 
   const rows = useMemo<Row[]>(() => {
     const s = q.trim().toLowerCase();

@@ -9,8 +9,16 @@ import {
 } from 'firebase/firestore';
 import { auth, call, db } from './firebase';
 
-// Same pattern as core/public.ts (importing it here would pull the op code into the public bundle).
-const isPublicPath = (path: string) => /^(players|teams|seasons)\/[^/]+$/.test(path);
+// Same routes as core/public.ts (importing it here would pull the op code into the public bundle).
+const PUBLIC_PATHS = [/^(players|teams|seasons)\/[^/]+$/, /^seasons\/[^/]+\/(matches|entries|rosters|awards)\/[^/]+$/];
+export const isPublicPath = (path: string) => PUBLIC_PATHS.some((r) => r.test(path));
+
+/** Ask the Worker to copy these documents into their summaries (best effort; the write itself already succeeded). */
+export async function syncPublicDocs(paths: string[]) {
+  const all = [...new Set(paths.filter(isPublicPath))];
+  // The op takes up to 50 paths per call.
+  for (let i = 0; i < all.length; i += 50) await call('syncPublic')({ paths: all.slice(i, i + 50) }).catch(() => undefined);
+}
 
 const AUDITED = [
   /^players\/[^/]+$/, /^teams\/[^/]+$/, /^requests\/[^/]+$/, /^content\/[^/]+$/, /^settings\/[^/]+$/,
@@ -78,10 +86,8 @@ class AuditedBatch {
       });
     }
     await this.inner.commit();
-    // Copy changed players, teams and seasons into the public summaries the site reads (core/public.ts).
-    // Best effort: the write itself has already succeeded.
-    const publicPaths = [...new Set(this.pending.map((p) => p.ref.path).filter(isPublicPath))];
-    if (publicPaths.length) await call('syncPublic')({ paths: publicPaths }).catch(() => undefined);
+    // Copy changed documents into the public summaries the site reads (core/public.ts).
+    await syncPublicDocs(this.pending.map((p) => p.ref.path));
   }
 }
 

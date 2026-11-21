@@ -1,12 +1,12 @@
-import { CSSProperties, useEffect, useState } from 'react';
-import { collection, getDocs, serverTimestamp } from 'firebase/firestore';
+import { CSSProperties, useMemo, useState } from 'react';
+import { collection, serverTimestamp } from 'firebase/firestore';
 import { addDoc } from '../lib/db';
 import { call, db } from '../lib/firebase';
 import { rosterLimit, squadIds, useLeague } from '../lib/league';
+import { useAllAwards } from '../lib/cache';
 import { PageHeader, Crest, Empty, Skeleton, Field, useAction } from '../components/ui';
 import { SignInButton } from '../components/Shell';
 import { teamHref } from '../modals/ModalContext';
-import type { Award } from '../lib/types';
 import { AwardIcon } from '../components/icons';
 import { Crown, Lock, Plus, Users } from 'lucide-react';
 
@@ -14,13 +14,8 @@ import { Crown, Lock, Plus, Users } from 'lucide-react';
 export default function TeamsPage() {
   const L = useLeague();
   const [creating, setCreating] = useState(false);
-  const [awards, setAwards] = useState<(Award & { seasonName: string })[] | null>(null);
-  useEffect(() => {
-    Promise.all(L.seasons.map(async (s) => (await getDocs(collection(db, `seasons/${s.id}/awards`))).docs
-      .map((d) => ({ id: d.id, ...d.data(), seasonName: s.name }) as Award & { seasonName: string })))
-      .then((x) => setAwards(x.flat().filter((a) => a.recipientType === 'team')))
-      .catch(() => setAwards([]));
-  }, [L.seasons]);
+  const all = useAllAwards();
+  const awards = useMemo(() => all && all.filter((a) => a.recipientType === 'team'), [all]);
 
   const cap = rosterLimit(L.general);
   const teams = L.teamList.filter((t) => t.active !== false && !t.mergedInto).sort((a, b) => a.name.localeCompare(b.name));

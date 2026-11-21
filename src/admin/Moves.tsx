@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { doc, orderBy } from 'firebase/firestore';
+import { collection, doc, limit, orderBy, query, where } from 'firebase/firestore';
 import { setDoc } from '../lib/db';
 import { call, db } from '../lib/firebase';
 import { useLeague } from '../lib/league';
-import { useCol } from '../lib/hooks';
+import { useCol, useQuery } from '../lib/hooks';
+
+/** How many requests the "Recent" tab lists. */
+const ALL_LIMIT = 100;
 import { SectionHeader, Empty, Field, useAction, TeamChip, Tabs } from '../components/ui';
 import { fmtAgo, ms } from '../lib/format';
 import type { RequestDoc } from '../lib/types';
@@ -69,14 +72,17 @@ export function AdminRequests() {
   const L = useLeague();
   const { run, busy } = useAction();
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
-  const { data: reqs } = useCol<RequestDoc>('requests', orderBy('createdAt', 'desc'));
-  const list = reqs.filter((r) => tab === 'all' || r.status === 'pending').sort((a, b) => ms(b.createdAt) - ms(a.createdAt));
+  // Pending: the same query as the admin inbox badge, so the two share one listener (no extra reads).
+  // All: only the most recent requests; the full history grows forever.
+  const { data: pending } = useCol<RequestDoc>('requests', where('status', '==', 'pending'));
+  const { data: recent } = useQuery<RequestDoc>(tab === 'all' ? () => query(collection(db, 'requests'), orderBy('createdAt', 'desc'), limit(ALL_LIMIT)) : null, `requests|recent|${tab}`);
+  const list = (tab === 'all' ? recent : pending).slice().sort((a, b) => ms(b.createdAt) - ms(a.createdAt));
   const decide = (id: string, decision: 'accept' | 'decline') => run(() => call<unknown, { removedFixtures?: number }>('decideRequest')({ requestId: id, decision }),
     (res) => decision === 'decline' ? 'Declined' : res?.removedFixtures ? `Accepted — ${res.removedFixtures} unplayed fixtures removed` : 'Accepted');
   return (
     <>
       <SectionHeader eyebrow="Moves" title="Team & season" accent="requests" />
-      <Tabs tabs={[{ key: 'pending', label: `Pending (${reqs.filter((r) => r.status === 'pending').length})` }, { key: 'all', label: 'All' }]} active={tab} onChange={setTab} />
+      <Tabs tabs={[{ key: 'pending', label: `Pending (${pending.length})` }, { key: 'all', label: `Recent (last ${ALL_LIMIT})` }]} active={tab} onChange={setTab} />
       <div className="card flush table-wrap">
         <table className="data">
           <thead><tr><th>Player</th><th>Type</th><th>From</th><th>To</th><th>Message</th><th>Status</th><th /></tr></thead>

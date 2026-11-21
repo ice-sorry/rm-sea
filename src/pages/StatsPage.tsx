@@ -1,7 +1,6 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { ReactNode, useMemo, useState } from 'react';
 import { useLeague } from '../lib/league';
+import { loadSeasonMatches, useCached } from '../lib/cache';
 import { useDoc, go } from '../lib/hooks';
 import { PageHeader, Tabs, Empty, Crest, TeamChip, Avatar, Skeleton, Flag } from '../components/ui';
 import { LeaderList, LineChart, ResultCard } from '../components/league';
@@ -243,12 +242,14 @@ const TeamsTab = () => <div className="card flush"><TeamsTable /></div>;
 function H2HTab() {
   const L = useLeague();
   const [a, setA] = useState(''), [b, setB] = useState('');
-  const [all, setAll] = useState<(MatchDoc & { seasonId: string })[] | null>(null);
-  useEffect(() => {
-    if (!a || !b || all) return;
-    Promise.all(L.seasons.map(async (s) => (await getDocs(collection(db, `seasons/${s.id}/matches`))).docs.map((d) => ({ id: d.id, seasonId: s.id, ...d.data() }) as MatchDoc & { seasonId: string })))
-      .then((x) => setAll(x.flat()));
-  }, [a, b, all, L.seasons]);
+  // Past seasons' matches: one match-list summary per season, read once per session after both teams are picked.
+  // The selected season comes from the live league data.
+  const pastIds = L.seasons.map((s) => s.id).filter((s) => s !== L.seasonId);
+  const ttl = L.isAdmin ? 0 : undefined;
+  const past = useCached(a && b ? `h2h|${pastIds.join(',')}` : null,
+    async () => (await Promise.all(pastIds.map(async (s) => (await loadSeasonMatches(s, ttl)).map((m) => ({ ...m, seasonId: s }))))).flat(), ttl);
+  const all = useMemo<(MatchDoc & { seasonId: string })[] | null>(() => (past
+    ? [...L.matches.map((m) => ({ ...m, seasonId: L.seasonId || '' })), ...past] : null), [L.matches, L.seasonId, past]);
   const games = (all || []).filter((m) => m.status === 'played' && [m.homeTeamId, m.awayTeamId].includes(a) && [m.homeTeamId, m.awayTeamId].includes(b));
   const wa = games.filter((m) => m.winnerTeamId === a).length, wb = games.filter((m) => m.winnerTeamId === b).length;
   const pick = (v: string, set: (s: string) => void) => (

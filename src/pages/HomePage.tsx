@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { limit, orderBy } from 'firebase/firestore';
 import { useLeague } from '../lib/league';
+import { useAllAwards } from '../lib/cache';
 import { useCol, useDoc } from '../lib/hooks';
 import { BRAND, SOCIALS } from '../lib/config';
 import { DiscordIcon } from '../components/Shell';
@@ -8,7 +9,7 @@ import { SectionHeader, StatCard, Empty, Crest, TeamChip, Avatar, PageHeader, Fl
 import { BracketView, FixtureCard, LeagueTable, ResultCard, useMatchLists } from '../components/league';
 import { useModal } from '../modals/ModalContext';
 import { fmtAgo, fmtDateTime } from '../lib/format';
-import type { Award, Bracket, Season, StandingsDoc } from '../lib/types';
+import type { Bracket, Season, StandingsDoc } from '../lib/types';
 import { Trophy } from 'lucide-react';
 
 export default function HomePage() {
@@ -217,7 +218,7 @@ function PinnedCelebration({ seasonId }: { seasonId: string }) {
   const L = useLeague();
   const { open } = useModal();
   const { data: standings, loading: standingsLoading } = useDoc<StandingsDoc>(`seasons/${seasonId}/derived/standings`);
-  const { data: awards } = useCol<Award>(`seasons/${seasonId}/awards`);
+  const awards = (useAllAwards() || []).filter((a) => a.seasonId === seasonId);
   const season = L.seasons.find((s) => s.id === seasonId);
   const championAward = awards.find((a) => a.type === 'champion');
   const champId = championAward?.recipientId || standings?.rows?.[0]?.teamId;

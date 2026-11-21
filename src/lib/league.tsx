@@ -50,17 +50,24 @@ export const useLeague = () => {
 };
 
 /**
- * Every player, team or season, read from its public summary (derived/players etc., 1 read; see core/public.ts).
- * Until an admin's first "Recompute season" builds the summary, it reads the whole collection instead.
+ * A collection read from its public summary document (1 read; see core/public.ts): `field` holds { [id]: data }.
+ * Until an admin's "Recompute season" builds the summary, or once it has grown too big (overflow), it reads the
+ * collection at `fallbackPath` instead.
  */
-function usePublicCol<T>(name: 'players' | 'teams' | 'seasons'): { data: (T & { id: string })[]; loading: boolean } {
-  const summary = useDoc<{ items?: Record<string, T> }>(`derived/${name}`);
-  const missing = !summary.loading && !summary.data;
-  const fallback = useCol<T>(missing ? name : null);
-  const data = useMemo(() => (summary.data
-    ? Object.entries(summary.data.items || {}).map(([id, v]) => ({ ...v, id }))
-    : fallback.data), [summary.data, fallback.data]);
+function useSummaryItems<T>(summaryPath: string | null, field: string, fallbackPath: string | null): { data: (T & { id: string })[]; loading: boolean } {
+  const summary = useDoc<Record<string, unknown> & { overflow?: boolean }>(summaryPath);
+  const usable = summary.data && !summary.data.overflow ? summary.data : null;
+  const missing = !!summaryPath && !summary.loading && !usable;
+  const fallback = useCol<T>(missing ? fallbackPath : null);
+  const data = useMemo(() => (usable
+    ? Object.entries((usable[field] || {}) as Record<string, T>).map(([id, v]) => ({ ...v, id }))
+    : fallback.data), [usable, field, fallback.data]);
   return { data, loading: summary.loading || (missing && fallback.loading) };
+}
+
+/** Every player, team or season (derived/players etc.). */
+function usePublicCol<T>(name: 'players' | 'teams' | 'seasons') {
+  return useSummaryItems<T>(`derived/${name}`, 'items', name);
 }
 
 export function LeagueProvider({ children }: { children: ReactNode }) {
@@ -87,9 +94,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const { data: teamDocs, loading: tLoading } = usePublicCol<Team>('teams');
   const { data: playerDocs } = usePublicCol<Player>('players');
-  const { data: matches } = useCol<MatchDoc>(seasonId ? `seasons/${seasonId}/matches` : null);
-  const { data: entryDocs } = useCol<Entry & { id: string }>(seasonId ? `seasons/${seasonId}/entries` : null);
-  const { data: rosterDocs } = useCol<{ playerIds: string[] }>(seasonId ? `seasons/${seasonId}/rosters` : null);
+  // Each from a summary document (1 read) instead of one read per match / team; see core/public.ts.
+  const { data: matches } = useSummaryItems<MatchDoc>(seasonId ? `seasons/${seasonId}/derived/matchList` : null, 'items', seasonId ? `seasons/${seasonId}/matches` : null);
+  const squads = seasonId ? `seasons/${seasonId}/derived/squads` : null;
+  const { data: entryDocs } = useSummaryItems<Entry & { id: string }>(squads, 'entries', seasonId ? `seasons/${seasonId}/entries` : null);
+  const { data: rosterDocs } = useSummaryItems<{ playerIds: string[] }>(squads, 'rosters', seasonId ? `seasons/${seasonId}/rosters` : null);
   const { data: standings, loading: sLoading } = useDoc<StandingsDoc>(seasonId ? `seasons/${seasonId}/derived/standings` : null);
   const { data: playerStats } = useDoc<PlayerStatsDoc>(seasonId ? `seasons/${seasonId}/derived/playerStats` : null);
   const { data: teamStats } = useDoc<TeamStatsDoc>(seasonId ? `seasons/${seasonId}/derived/teamStats` : null);
