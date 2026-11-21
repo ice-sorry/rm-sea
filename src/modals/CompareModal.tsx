@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useMemo, useState } from 'react';
 import { useLeague } from '../lib/league';
+import { loadPlayerStats, useCached } from '../lib/cache';
 import { useDoc } from '../lib/hooks';
 import { Avatar, TeamChip, Tabs, Flag } from '../components/ui';
 import { pct } from '../lib/format';
@@ -13,13 +12,12 @@ export default function CompareModal({ initial }: { initial: string[] }) {
   const L = useLeague();
   const [ids, setIds] = useState<string[]>(initial);
   const [scope, setScope] = useState<Scope>(L.seasonId || 'all');
-  const [rows, setRows] = useState<Record<string, PlayerStatRow>>({});
   const { data: records } = useDoc<RecordsDoc>('derived/records');
-  useEffect(() => {
-    if (scope === 'all') return;
-    getDoc(doc(db, `seasons/${scope}/derived/playerStats`)).then((d) =>
-      setRows(Object.fromEntries(((d.data()?.rows || []) as PlayerStatRow[]).map((r) => [r.playerId, r]))));
-  }, [scope]);
+  // The selected season's rows come from the live league data; other seasons are read once per session.
+  const ttl = L.isAdmin ? 0 : undefined;
+  const other = useCached(scope !== 'all' && scope !== L.seasonId ? `playerStats|${scope}` : null, () => loadPlayerStats(scope, ttl), ttl);
+  const rows = useMemo<Record<string, PlayerStatRow>>(() => Object.fromEntries(
+    ((scope === L.seasonId ? L.playerStats?.rows : other) || []).map((r) => [r.playerId, r])), [scope, L.seasonId, L.playerStats, other]);
   const metrics: { label: string; get: (id: string) => number | null; fmt?: (n: number | null) => string }[] = scope === 'all'
     ? [
       { label: 'Games', get: (id) => records?.career?.[id]?.gp ?? 0 },

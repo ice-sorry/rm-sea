@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 import { useLeague } from '../lib/league';
+import { loadAwards, useCached } from '../lib/cache';
 import { useDoc, go } from '../lib/hooks';
 import { PageHeader, Tabs, Empty, Crest, Avatar, Skeleton, Flag } from '../components/ui';
 import { useModal } from '../modals/ModalContext';
-import type { Award, RecordsDoc } from '../lib/types';
+import type { RecordsDoc } from '../lib/types';
 import { Award as AwardBadge, ScrollText, Trophy } from 'lucide-react';
 import { AwardIcon } from '../components/icons';
 
@@ -32,11 +30,8 @@ export default function AwardsPage({ sub }: { sub: string }) {
 function Trophies() {
   const L = useLeague();
   const { open } = useModal();
-  const [bySeason, setBySeason] = useState<Record<string, Award[]> | null>(null);
-  useEffect(() => {
-    Promise.all(L.seasons.map(async (s) => [s.id, (await getDocs(collection(db, `seasons/${s.id}/awards`))).docs.map((d) => ({ id: d.id, ...d.data() }) as Award)] as const))
-      .then((x) => setBySeason(Object.fromEntries(x)));
-  }, [L.seasons]);
+  const ids = L.seasons.map((s) => s.id);
+  const bySeason = useCached(`awards|${ids.join(',')}`, () => loadAwards(ids, L.isAdmin ? 0 : undefined), L.isAdmin ? 0 : undefined);
   if (!bySeason) return <Skeleton />;
   const any = Object.values(bySeason).some((a) => a.length);
   if (!any) return <Empty>No trophies awarded yet.</Empty>;
