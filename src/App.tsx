@@ -53,12 +53,14 @@ function Routes() {
   useEffect(() => { window.scrollTo(0, 0); }, [route, sub]);
 
   // Signed in without a player → straight to player setup (once per session, so they can still browse afterwards).
+  // Check users/{uid}.playerId, not L.myPlayer: the players list can still be loading, which would make every
+  // existing player look player-less for a moment and bounce them to #me (and from there to their profile).
   useEffect(() => {
-    if (!L.authUser || !L.meReady || !L.ready || L.myPlayer || ['me', 'admin'].includes(route)) return;
+    if (!L.authUser || !L.meReady || !L.ready || L.me?.playerId || ['me', 'admin'].includes(route)) return;
     if (sessionStorage.getItem('srl_setup_prompted') === L.authUser.uid) return;
     sessionStorage.setItem('srl_setup_prompted', L.authUser.uid);
     location.hash = '#me';
-  }, [L.authUser, L.meReady, L.ready, L.myPlayer, route]);
+  }, [L.authUser, L.meReady, L.ready, L.me?.playerId, route]);
 
   let page;
   switch (route) {
