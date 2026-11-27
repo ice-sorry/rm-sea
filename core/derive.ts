@@ -1,10 +1,10 @@
 import { onCall, logger, invoke } from './runtime';
 import type { QuerySnapshot, WriteBatch } from './firestore';
-import { db, FieldValue, getSettings, getPrivateDiscord, discordAllowed, requireAdmin } from './admin';
-import { webhookPost } from './discord';
+import { db, FieldValue, getSettings, getPrivateDiscord, discordAllowed, requireAdmin, DISCORD_BOT_TOKEN } from './admin';
+import { discordApi, webhookPost } from './discord';
 import { rebuildPublic, writeSummary } from './public';
 import {
-  Bracket, BracketSlot, Entry, Match, Season, DEFAULT_SEASON, summarizeSeries, computeStandings, computePlayerStats,
+  Bracket, BracketSlot, Entry, Game, Match, Season, DEFAULT_SEASON, summarizeSeries, computeStandings, computePlayerStats,
   computeTeamStats, computeLeaders, recomputeBracket, matchweekOf, stageForRoundKey, PlayerStatRow, StandingRow,
 } from './shared/league';
 
@@ -363,8 +363,8 @@ export const matchSideEffects = onCall(async (req) => {
     if (key !== prev) {
       if (key) {
         const edited = !!prev;
-        const integ = await getSettings<{ autoPost?: boolean; autoPostOnEdit?: boolean }>('integrations');
-        if (discordAllowed(integ) && ((!edited && integ.autoPost) || (edited && integ.autoPostOnEdit))) await postResult(seasonId, m, edited).catch((e) => logger.warn(e));
+        const integ = await getSettings<{ autoPost?: boolean; autoPostOnEdit?: boolean; matchReportChannelId?: string }>('integrations');
+        if (discordAllowed(integ) && ((!edited && integ.autoPost) || (edited && integ.autoPostOnEdit))) await postResult(seasonId, m, edited, integ.matchReportChannelId).catch((e) => logger.warn(e));
       }
       await ref.update({ postedResultKey: key });
     }
@@ -372,23 +372,71 @@ export const matchSideEffects = onCall(async (req) => {
   return { ok: true };
 });
 
-async function postResult(seasonId: string, m: Match, edited: boolean) {
-  const priv = await getPrivateDiscord();
-  if (!priv.resultWebhookUrl) return;
-  const names = await teamNames(); // 1 read from the teams summary
-  const general = await getSettings<{ siteUrl?: string; leagueName?: string }>('general');
-  let mvp = '';
-  if (m.mvpPlayerId) mvp = (await db.doc(`players/${m.mvpPlayerId}`).get()).data()?.name || '';
-  const games = (m.games || []).map((g) => `Game ${g.n}: ${g.homeGoals}–${g.awayGoals}`).join('\n');
-  await webhookPost(priv.resultWebhookUrl, {
-    username: general.leagueName || 'SEA Rematch League',
-    embeds: [{
-      title: `${edited ? '✏️ Updated: ' : ''}${names[m.homeTeamId] || 'Home'} ${m.seriesHome}–${m.seriesAway} ${names[m.awayTeamId] || 'Away'}`,
-      description: `${m.stage === 'league' ? `Round ${m.round}` : m.stage.toUpperCase()}\n${games}${mvp ? `\n⭐ MVP: ${mvp}` : ''}`,
-      color: 0x1d8ade,
-      url: general.siteUrl ? `${general.siteUrl}/#fixtures?match=${seasonId}/${m.id}` : undefined,
-    }],
+const STAGE_NAMES: Record<string, string> = { wildcard: 'Wildcard', qf: 'Quarterfinal', sf: 'Semifinal', final: 'Final', cup: 'Cup' };
+/** Escape Discord markdown so names like "x_Striker_x" render as typed. */
+const esc = (s: string) => s.replace(/([\\*_~`|>])/g, '\\$1');
+
+/**
+ * The bot posts to the match report channel; the result webhook is the fallback when no channel is set
+ * (or the bot token is missing).
+ */
+async function postResult(seasonId: string, m: Match, edited: boolean, channelId?: string) {
+  const token = DISCORD_BOT_TOKEN.value();
+  const viaBot = !!(channelId && token);
+  const webhookUrl = viaBot ? '' : (await getPrivateDiscord()).resultWebhookUrl;
+  if (!viaBot && !webhookUrl) return;
+  const [names, general, season] = await Promise.all([
+    teamNames(), // 1 read from the teams summary
+    getSettings<{ siteUrl?: string; leagueName?: string }>('general'),
+    loadSeason(seasonId),
+  ]);
+  const home = names[m.homeTeamId] || 'Home', away = names[m.awayTeamId] || 'Away';
+  const games = m.games || [];
+  const pids = [...new Set([...games.flatMap((g) => Object.keys(g.playerStats || {})), ...(m.mvpPlayerId ? [m.mvpPlayerId] : [])])];
+  // One batch read: the winning team (for the embed colour) plus every player named in the post.
+  const [winner, ...players] = await db.getAll(db.doc(`teams/${m.winnerTeamId || '_none'}`), ...pids.map((id) => db.doc(`players/${id}`)));
+  const winColor = String(winner.data()?.color || '');
+  // Winner's colour; white for a draw (no winner).
+  const color = !m.winnerTeamId ? 0xffffff : /^#[0-9a-f]{6}$/i.test(winColor) ? parseInt(winColor.slice(1), 16) : 0x1d8ade;
+  // Raw names: field names show text as typed, while values and the description need esc().
+  const pname = new Map(players.map((p) => [p.id, String(p.data()?.name || 'Unknown player')]));
+
+  // Per game: "Game N" with the score line under it, then one row of three columns with no headers
+  // (home scorers left, an empty spacer, away scorers right). The game's MVP follows directly as a
+  // field name, whose blank value also spaces the games apart.
+  const blank = '​';
+  const scorers = (g: Game, teamId: string) => Object.entries(g.playerStats || {})
+    .filter(([, s]) => s.teamId === teamId && (s.goals || 0) > 0)
+    .sort(([, a], [, b]) => (b.goals || 0) - (a.goals || 0))
+    .map(([id, s]) => `${esc(pname.get(id)!)} ${s.goals! > 5 ? `⚽ ×${s.goals}` : '⚽'.repeat(s.goals!)}`)
+    .join('\n') || blank;
+  const fields = games.flatMap((g) => {
+    const mvpId = Object.entries(g.playerStats || {}).find(([, s]) => s.mvp)?.[0];
+    return [
+      { name: `Game ${g.n}`, value: `${esc(home)} **${g.homeGoals} – ${g.awayGoals}** ${esc(away)}` },
+      { name: blank, value: scorers(g, m.homeTeamId), inline: true },
+      // Discord allows 25 fields: a 5-game series drops the spacer so the series MVP still fits.
+      ...(games.length <= 4 ? [{ name: blank, value: blank, inline: true }] : []),
+      { name: blank, value: scorers(g, m.awayTeamId), inline: true },
+      ...(mvpId ? [{ name: `⭐ MVP: ${pname.get(mvpId)}`, value: blank }] : []),
+    ];
   });
+  if (m.mvpPlayerId) fields.push({ name: '🏆 Series MVP', value: `**${esc(pname.get(m.mvpPlayerId)!)}**` });
+
+  const stage = m.stage === 'league' ? `Round ${m.round}` : STAGE_NAMES[m.stage] || m.stage;
+  // Discord timestamp: each viewer sees the date in their own locale and time zone.
+  const played = (m.matchDate || m.kickoffAt)?.toMillis?.();
+  const playedAt = played ? Math.floor(played / 1000) : null;
+  const embeds = [{
+    // The title sits above the description and links to the match page.
+    title: `${edited ? '✏️ Updated · ' : ''}${season.name} · ${stage}`,
+    url: general.siteUrl ? `${general.siteUrl}/#fixtures?match=${seasonId}/${m.id}` : undefined,
+    description: `# ${esc(home)} ${m.seriesHome} – ${m.seriesAway} ${esc(away)}${playedAt ? `\n-# <t:${playedAt}:D>` : ''}`,
+    fields: fields.slice(0, 25), // Discord's limit (see the spacer above)
+    color,
+  }];
+  if (viaBot) await discordApi(token, 'POST', `/channels/${channelId}/messages`, { embeds, allowed_mentions: { parse: [] } });
+  else await webhookPost(webhookUrl!, { username: general.leagueName || 'SEA Rematch League', embeds });
 }
 
 // ---------- Cups ----------
