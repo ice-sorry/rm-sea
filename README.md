@@ -150,4 +150,5 @@ Admin role IDs `1562781903604424794, 1563169917384134827` grant admin automatica
 - `Recap` from the spec is covered by per-player **Wrapped** (on #me) and the pinned season celebration on Home.
 - Each Firestore listener in the client loads a whole season (matches, rosters, players, teams). That's fine for a community league of this size; if the league grows to thousands of players, page the players list.
 - Role removal during *Sync roles* needs the Server Members intent; without it, only additions happen.
+- With *Create missing roles* on, an active team with a blank Discord role ID gets one: the bot reuses a server role with the team's exact name, or creates one (team colour, no permissions). The captain role works the same way under the name "Captain". New roles land at the bottom of the role list, below the bot's role. Renaming a team doesn't rename its role.
 - Not yet measured: Lighthouse mobile score (target ≥ 85). The layout is designed for 360 px wide.

@@ -6,7 +6,7 @@ import { useLeague } from '../lib/league';
 import { SectionHeader, Empty, Crest, Field, useAction, Confirm, Avatar, TeamChip, Flag, CountrySelect } from '../components/ui';
 import { POSITIONS, POSITION_LABELS } from '../lib/types';
 import type { Position, Team, Player } from '../lib/types';
-import { actor, normalizeTeamName, notifyNewTeam, notifyRosterMove, syncTeamRoles } from './util';
+import { actor, normalizeTeamName, notifyNewTeam, notifyRosterMove, syncCaptainRoles, syncTeamRoles } from './util';
 import { normalizeImageLink } from '../lib/images';
 import { Check, RefreshCw } from 'lucide-react';
 
@@ -23,11 +23,17 @@ export function AdminTeams() {
       name: e.name.trim(), shortName: (e.shortName || e.name.slice(0, 4)).trim().toUpperCase(), nameNormalized: normalizeTeamName(e.name),
       color: e.color, crestUrl: e.crestUrl ? normalizeImageLink(e.crestUrl) : '', discordRoleId: e.discordRoleId || null, captainIds: e.captainIds, active: e.active,
     };
-    if (e.id) await updateDoc(doc(db, 'teams', e.id), data);
+    const prev = e.id ? L.teams[e.id] : undefined;
+    let id = e.id;
+    if (id) await updateDoc(doc(db, 'teams', id), data);
     else {
-      const ref = await addDoc(collection(db, 'teams'), { ...data, mergedInto: null });
-      if (data.active) await notifyNewTeam(ref.id);
+      id = (await addDoc(collection(db, 'teams'), { ...data, mergedInto: null })).id;
+      if (data.active) await notifyNewTeam(id);
     }
+    // A blank role ID gets a role created (when that's on); changed captains or active flag move the captain role.
+    const captainsChanged = !prev || prev.active !== data.active || [...(prev.captainIds || [])].sort().join() !== [...data.captainIds].sort().join();
+    if (captainsChanged) await syncCaptainRoles(id);
+    else if (!data.discordRoleId || (prev!.discordRoleId || null) !== data.discordRoleId) await syncTeamRoles(id);
     setEdit(null);
   }, 'Team saved');
   const roster = edit?.id ? (L.rosters[edit.id] || []) : [];
@@ -54,8 +60,9 @@ export function AdminTeams() {
       .forEach((d) => b.update(d.ref, { status: 'declined', decidedBy: actor(), decidedAt: serverTimestamp(), message: `${d.data().message || ''} (team deleted)`.trim() }));
     await b.commit();
     await syncTeamRoles(id);
-    // 2. Then the team itself.
+    // 2. Then the team itself, and its captains lose the captain role unless they captain another team.
     await deleteDoc(doc(db, 'teams', id));
+    await syncCaptainRoles();
     setEdit(null);
   }, `${name} deleted`);
 
@@ -69,7 +76,7 @@ export function AdminTeams() {
             <Field label="Name"><input className="input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
             <Field label="Short name (≤4)"><input className="input" maxLength={4} value={edit.shortName} onChange={(e) => setEdit({ ...edit, shortName: e.target.value })} /></Field>
             <Field label="Colour"><input type="color" value={edit.color} onChange={(e) => setEdit({ ...edit, color: e.target.value })} style={{ width: '100%', height: 38 }} /></Field>
-            <Field label="Discord role ID"><input className="input" value={edit.discordRoleId || ''} onChange={(e) => setEdit({ ...edit, discordRoleId: e.target.value.trim() })} /></Field>
+            <Field label="Discord role ID (blank: the bot creates one)"><input className="input" value={edit.discordRoleId || ''} onChange={(e) => setEdit({ ...edit, discordRoleId: e.target.value.trim() })} /></Field>
           </div>
           <div className="row wrap">
             <Crest team={{ ...edit, id: edit.id || 'new', nameNormalized: '', mergedInto: null, discordRoleId: null } as Team} size="lg" />

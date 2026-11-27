@@ -138,10 +138,10 @@ export async function movePlayer(seasonId: string, playerId: string, toTeamId: s
   return { fromTeamId, toTeamId };
 }
 
-/** Best-effort Discord team-role sync for the rosters that just changed. */
-export async function syncRolesFor(teamIds: (string | null)[]) {
+/** Best-effort Discord team-role sync for the rosters that just changed; `captains` when captain lists changed too. */
+export async function syncRolesFor(teamIds: (string | null)[], captains = false) {
   const ids = teamIds.filter((t): t is string => !!t);
-  if (ids.length) await invoke('syncTeamRoles', { teamIds: ids }).catch(() => undefined);
+  if (ids.length || captains) await invoke('syncTeamRoles', { teamIds: ids, captains }).catch(() => undefined);
 }
 
 /** `removed`: an admin took the player off the team (a kick), rather than the player leaving. */
@@ -535,7 +535,8 @@ export const decideRequest = onCall(async (req) => {
       await p.ref.update({ currentTeamId: teamRef.id, updatedAt: FieldValue.serverTimestamp() });
     }
     await ref.update({ status: 'accepted', toTeamId: teamRef.id, decidedBy: uid, decidedAt: FieldValue.serverTimestamp() });
-    await syncRolesFor([fromTeamId]);
+    // The new club gets its role (created when missing) and its captain the captain role.
+    await syncRolesFor([fromTeamId, teamRef.id], true);
     await announceMoves([{ playerId: r.playerId, fromTeamId, toTeamId: teamRef.id }], [teamRef.id]);
     return { status: 'accepted', teamId: teamRef.id };
   }

@@ -72,9 +72,10 @@ function Discord() {
   const { run, busy } = useAction();
   const [f, setF] = useSettingsForm('settings/integrations', {
     guildId: '1562776724431831050', matchReportChannelId: '', alertsChannelId: '', rosterChannelId: '', autoPost: true, autoPostOnEdit: false,
-    discordEnabled: true, rosterPosts: true, requestPosts: true, roleSync: true, matchThreads: true, playerDms: true,
+    discordEnabled: true, rosterPosts: true, requestPosts: true, roleSync: true, roleCreate: true, captainRole: true, matchThreads: true, playerDms: true,
+    captainRoleId: '',
   });
-  type Switch = 'discordEnabled' | 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads' | 'playerDms';
+  type Switch = 'discordEnabled' | 'rosterPosts' | 'requestPosts' | 'roleSync' | 'roleCreate' | 'captainRole' | 'matchThreads' | 'playerDms';
   // Older settings docs lack the switches; a missing switch counts as on (the Worker reads it the same way).
   const on = (k: Switch) => f[k] !== false;
   const toggle = (k: Switch, label: string, hint: string) => (
@@ -91,6 +92,8 @@ function Discord() {
           {toggle('requestPosts', 'Admin request posts', 'Post when someone makes a request only an admin can approve: a new club, a season entry or exit, or a removal. The admin roles are mentioned.')}
           {toggle('playerDms', 'Player DMs', 'Message players privately when a captain invites them, and message captains when someone asks to join their team')}
           {toggle('roleSync', 'Team role sync', 'Give and remove team roles when rosters change')}
+          {toggle('roleCreate', 'Create missing roles', 'When an active team has no Discord role ID (or the captain role ID is blank), the bot reuses a server role with the same name or creates one, and saves its ID')}
+          {toggle('captainRole', 'Captain role', "Give the captain role to every active team's captains and take it from anyone else")}
           {toggle('matchThreads', 'Matchweek threads', 'Create and rename fixture threads')}
           <label className="check"><input type="checkbox" disabled={!on('discordEnabled')} checked={!!f.autoPost} onChange={(e) => setF({ ...f, autoPost: e.target.checked })} />Auto-post results</label>
           <label className="check"><input type="checkbox" disabled={!on('discordEnabled') || !f.autoPost} checked={!!f.autoPostOnEdit} onChange={(e) => setF({ ...f, autoPostOnEdit: e.target.checked })} />…and when a result is edited</label>
@@ -100,13 +103,13 @@ function Discord() {
       </div>
       <div className="card stack">
         <div className="form-grid">
-          {text('guildId', 'Guild (server) ID')}{text('matchReportChannelId', 'Match report channel ID')}{text('alertsChannelId', 'Alerts channel ID')}{text('rosterChannelId', 'Roster moves channel ID')}
+          {text('guildId', 'Guild (server) ID')}{text('matchReportChannelId', 'Match report channel ID')}{text('alertsChannelId', 'Alerts channel ID')}{text('rosterChannelId', 'Roster moves channel ID')}{text('captainRoleId', 'Captain role ID (blank: the bot creates "Captain")')}
         </div>
         <p className="small muted" style={{ margin: 0 }}>Roster moves: the bot posts there when a player signs for or leaves a team, or a new team is created. Alerts: the bot posts there when someone asks for a new club, a season entry or exit, or a player's removal, so an admin can approve it, and mentions the admin roles from Settings → Admins. For the mention to ping, give the bot "Mention @everyone, @here and All Roles" or make those roles mentionable. Leave a channel blank to turn its posts off. The bot needs Send Messages and Embed Links in those channels.</p>
         <button className="btn primary" disabled={busy} onClick={() => run(() => setDoc(doc(db, 'settings/integrations'), f, { merge: true }), 'Saved')}>Save</button>
       </div>
       <div className="card row wrap">
-        <button className="btn" disabled={busy} onClick={() => run(() => call<unknown, { added: number; removed: number }>('syncRoles')({}), (r) => `Roles synced: ${r.added} added, ${r.removed} removed`)}><RefreshCw size={15} aria-hidden />Sync team roles</button>
+        <button className="btn" disabled={busy} onClick={() => run(() => call<unknown, { added: number; removed: number; created?: number }>('syncRoles')({}), (r) => `Roles synced: ${r.created ? `${r.created} roles created, ` : ''}${r.added} added, ${r.removed} removed`)}><RefreshCw size={15} aria-hidden />Sync team & captain roles</button>
         <button className="btn" disabled={busy} onClick={() => run(() => call('registerCommands')({}), 'Registered /standings and /next')}><Keyboard size={15} aria-hidden />Register slash commands</button>
         <button className="btn" disabled={busy} onClick={() => run(async () => { await call('refreshClaims')({}); await reloadClaims(); })}><KeyRound size={15} aria-hidden />Refresh my claims</button>
       </div>

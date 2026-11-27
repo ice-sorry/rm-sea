@@ -21,6 +21,9 @@ export const notifyNewTeam = (teamId: string) =>
   call('notifyRosterMove')({ moves: [], newTeamIds: [teamId] }).catch(() => undefined);
 export const syncTeamRoles = (...teamIds: (string | null | undefined)[]) =>
   call('syncTeamRoles')({ teamIds: teamIds.filter(Boolean) }).catch(() => undefined);
+/** Like syncTeamRoles, and also re-syncs the captain role (for when a team's captains or active flag changed). */
+export const syncCaptainRoles = (...teamIds: (string | null | undefined)[]) =>
+  call('syncTeamRoles')({ teamIds: teamIds.filter(Boolean), captains: true }).catch(() => undefined);
 
 export const actor = () => auth.currentUser?.uid || 'unknown';
 export const stamp = () => ({ updatedBy: actor(), updatedAt: serverTimestamp() });

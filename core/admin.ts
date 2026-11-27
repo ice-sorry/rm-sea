@@ -37,18 +37,20 @@ export async function getSettings<T = Record<string, any>>(id: string): Promise<
   return (s.data() || {}) as T;
 }
 /** Discord switches in Admin → Settings → Discord & roles (settings/integrations). A missing field counts as on. */
-export type DiscordFeature = 'rosterPosts' | 'requestPosts' | 'roleSync' | 'matchThreads' | 'playerDms';
+export type DiscordFeature = 'rosterPosts' | 'requestPosts' | 'roleSync' | 'roleCreate' | 'captainRole' | 'matchThreads' | 'playerDms';
 export function discordAllowed(integ: Record<string, unknown>, feature?: DiscordFeature): boolean {
   return integ.discordEnabled !== false && (!feature || integ[feature] !== false);
 }
 export async function discordOn(feature?: DiscordFeature): Promise<boolean> {
   return discordAllowed(await getSettings<Record<string, unknown>>('integrations'), feature);
 }
-/** For admin buttons: explain why nothing happened instead of silently skipping. */
-export async function requireDiscordOn(feature?: DiscordFeature) {
-  if (!(await discordOn(feature))) {
+/** For admin buttons: explain why nothing happened instead of silently skipping. Returns settings/integrations. */
+export async function requireDiscordOn(feature?: DiscordFeature): Promise<Record<string, unknown>> {
+  const integ = await getSettings<Record<string, unknown>>('integrations');
+  if (!discordAllowed(integ, feature)) {
     throw new HttpsError('failed-precondition', feature ? 'This Discord feature is turned off in Settings → Discord & roles.' : 'Discord is turned off in Settings → Discord & roles.');
   }
+  return integ;
 }
 export async function getPrivateDiscord(): Promise<Record<string, string>> {
   const s = await db.doc('private/discord').get();
