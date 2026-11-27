@@ -1,5 +1,6 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState, lazy, Suspense } from 'react';
+import { Component, createContext, ReactNode, useCallback, useContext, useEffect, useState, Suspense } from 'react';
 import { Modal } from '../components/ui';
+import { lazyWithReload } from '../lib/lazy';
 
 export type ModalSpec =
   | { kind: 'player'; id: string }
@@ -15,9 +16,25 @@ export const useModal = () => useContext(Ctx);
 export const playerHref = (id: string) => `#player/${encodeURIComponent(id)}`;
 export const teamHref = (id: string) => `#team/${encodeURIComponent(id)}`;
 
-const MatchModal = lazy(() => import('./MatchModal'));
-const LeaderboardModal = lazy(() => import('./LeaderboardModal'));
-const CompareModal = lazy(() => import('./CompareModal'));
+const MatchModal = lazyWithReload(() => import('./MatchModal'));
+const LeaderboardModal = lazyWithReload(() => import('./LeaderboardModal'));
+const CompareModal = lazyWithReload(() => import('./CompareModal'));
+
+/** Keeps a popup that fails to load (or crashes) inside the popup, instead of blanking the whole site. */
+class PopupBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(e: unknown) { console.error('Popup failed', e); }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="empty stack" style={{ alignItems: 'center' }}>
+        <span>This couldn't load. The site may have just been updated.</span>
+        <button className="btn primary" onClick={() => location.reload()}>Reload the page</button>
+      </div>
+    );
+  }
+}
 
 export function ModalProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<ModalSpec[]>([]);
@@ -43,11 +60,14 @@ export function ModalProvider({ children }: { children: ReactNode }) {
       {children}
       {top && (
         <Modal onClose={close} wide={top.kind === 'compare'}>
-          <Suspense fallback={<div className="empty">Loading…</div>}>
-            {top.kind === 'match' && <MatchModal id={top.id} cupId={top.cupId} seasonId={top.seasonId} />}
-            {top.kind === 'leaderboard' && <LeaderboardModal category={top.category} />}
-            {top.kind === 'compare' && <CompareModal initial={top.ids} />}
-          </Suspense>
+          {/* Keyed per popup, so a failure in one doesn't stick to the next one opened. */}
+          <PopupBoundary key={stack.length + JSON.stringify(top)}>
+            <Suspense fallback={<div className="empty">Loading…</div>}>
+              {top.kind === 'match' && <MatchModal id={top.id} cupId={top.cupId} seasonId={top.seasonId} />}
+              {top.kind === 'leaderboard' && <LeaderboardModal category={top.category} />}
+              {top.kind === 'compare' && <CompareModal initial={top.ids} />}
+            </Suspense>
+          </PopupBoundary>
         </Modal>
       )}
     </Ctx.Provider>

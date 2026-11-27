@@ -61,6 +61,16 @@ function retain(match: (e: Entry) => boolean, create: () => Entry, cb: (s: Snap<
 
 if (typeof document !== 'undefined') {
   let pauseTimer: ReturnType<typeof setTimeout> | undefined;
+  const resume = () => {
+    clearTimeout(pauseTimer);
+    if (!paused || document.hidden) return;
+    paused = false;
+    entries.forEach(run);
+  };
+  // Backup for a missed visibilitychange (a restored or uncovered window, a page back from the back/forward
+  // cache): while paused, new listeners never start, so a newly opened match would never load.
+  window.addEventListener('focus', resume);
+  window.addEventListener('pageshow', resume);
   document.addEventListener('visibilitychange', () => {
     clearTimeout(pauseTimer);
     if (document.hidden) {
@@ -71,10 +81,7 @@ if (typeof document !== 'undefined') {
           else { e.stop?.(); e.stop = null; } // on screen: keep showing what we have
         }
       }, HIDDEN_PAUSE_MS);
-    } else if (paused) {
-      paused = false;
-      entries.forEach(run);
-    }
+    } else resume();
   });
 }
 

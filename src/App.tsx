@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { lazyWithReload } from './lib/lazy';
 import { LeagueProvider, useLeague } from './lib/league';
 import { useHash } from './lib/hooks';
 import { ModalProvider, useModal } from './modals/ModalContext';
@@ -20,7 +21,7 @@ import MePage from './pages/MePage';
 import RulesPage from './pages/RulesPage';
 
 // Heavy admin panels load on demand.
-const AdminPage = lazy(() => import('./admin/AdminPage'));
+const AdminPage = lazyWithReload(() => import('./admin/AdminPage'));
 
 function AuthCallback() {
   const [error, setError] = useState('');
@@ -45,7 +46,8 @@ function Routes() {
   useEffect(() => {
     const m = params.get('match'), p = params.get('player'), t = params.get('team');
     if (p || t) { location.replace(p ? `#player/${encodeURIComponent(p)}` : `#team/${encodeURIComponent(t!)}`); return; }
-    if (m) open({ kind: 'match', id: m.split('/').pop()! });
+    // "<seasonId>/<matchId>" (Discord result links) opens that season's match whichever season is selected.
+    if (m) { const [a, b] = m.split('/'); open(b ? { kind: 'match', id: b, seasonId: a } : { kind: 'match', id: a }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.toString()]);
 
