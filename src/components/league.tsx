@@ -63,8 +63,12 @@ export function ResultCard({ m, cupId, seasonId }: { m: MatchDoc; cupId?: string
   const { open } = useModal();
   const h = teams[m.homeTeamId], a = teams[m.awayTeamId];
   const hw = m.winnerTeamId === m.homeTeamId, aw = m.winnerTeamId === m.awayTeamId;
+  // A gradient in the winner's colour from the winner's side; a draw gets a white one from both sides.
+  const glow = hw ? 'won-home' : aw ? 'won-away' : 'drawn';
+  const winColor = hw ? h?.color : aw ? a?.color : undefined;
   return (
-    <div className="match-card" onClick={() => open({ kind: 'match', id: m.id, cupId, seasonId })}>
+    <div className={`match-card ${glow}`} style={winColor ? ({ '--win-team': winColor } as React.CSSProperties) : undefined}
+      onClick={() => open({ kind: 'match', id: m.id, cupId, seasonId })}>
       <span className="tint" style={{ background: h?.color }} /><span className="tint r" style={{ background: a?.color }} />
       <div className="meta"><span>{stageLabel(m)}</span><span>{fmtDate(m.matchDate || m.kickoffAt)}{m.verification === 'check' && <> · <TriangleAlert size={12} aria-label="Needs a check" /></>}</span></div>
       <div className="teams">

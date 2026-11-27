@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { USE_EMULATORS } from '../lib/firebase';
 import { useLeague } from '../lib/league';
 import { go } from '../lib/hooks';
@@ -15,6 +16,16 @@ export function TopBar({ route }: { route: string }) {
   const L = useLeague();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menu, setMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // The account menu closes on a click anywhere outside it, or on Escape.
+  useEffect(() => {
+    if (!menu) return;
+    const down = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenu(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(false); };
+    document.addEventListener('pointerdown', down);
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('pointerdown', down); document.removeEventListener('keydown', key); };
+  }, [menu]);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -30,10 +41,10 @@ export function TopBar({ route }: { route: string }) {
       <div className="topbar-inner">
         <a className="brand" href="#home"><img src={BRAND.logo} alt="" />{BRAND.short}</a>
         <nav className="nav" aria-label="Main">
-          {NAV.map((n) => <a key={n.route} href={`#${n.route}`} className={route === n.route || (n.route === 'cups' && route === 'cup') ? 'active' : ''}><n.icon size={16} aria-hidden />{n.label}</a>)}
+          {NAV.map((n) => <a key={n.route} href={`#${n.route}`} className={route === n.route || (n.route === 'cups' && route === 'cup') ? 'active' : ''} title={n.label} aria-label={n.label}><n.icon size={16} aria-hidden /><span className="nav-label">{n.label}</span></a>)}
         </nav>
         <div className="grow" />
-        <button className="search-btn" onClick={() => setSearchOpen(true)} aria-label="Search"><Search size={15} aria-hidden /><span className="hide-sm">Search</span> <kbd>/</kbd></button>
+        <button className="search-btn" onClick={() => setSearchOpen(true)} aria-label="Search"><Search size={15} aria-hidden /><span className="hide-sm search-label">Search</span> <kbd>/</kbd></button>
         {L.seasons.length > 0 && (
           <select className="season-select" value={L.seasonId || ''} onChange={(e) => L.setSeasonId(e.target.value)} aria-label="Season">
             {L.seasons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -41,7 +52,7 @@ export function TopBar({ route }: { route: string }) {
         )}
         {SOCIALS.youtube && <a className="icon-btn" href={SOCIALS.youtube} target="_blank" rel="noreferrer" aria-label="YouTube"><YouTubeIcon /></a>}
         {L.authUser ? (
-          <div style={{ position: 'relative' }}>
+          <div ref={menuRef} style={{ position: 'relative' }}>
             <button className="icon-btn" style={{ width: 'auto' }} onClick={() => setMenu(!menu)} aria-label="Account"><Avatar src={L.me?.avatarUrl} name={L.me?.displayName} /></button>
             {menu && (
               <div className="overflow-menu" style={{ position: 'absolute', top: 40, right: 0, bottom: 'auto' }} onClick={() => setMenu(false)}>
@@ -124,9 +135,12 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
     onClose();
     if (r.kind === 'page') go(r.id); else open({ kind: r.kind, id: r.id });
   };
-  return (
+  // Rendered into <body>: the top bar's backdrop-filter would otherwise confine these fixed layers to the
+  // 56px bar, so the backdrop wouldn't cover the page and clicking outside wouldn't close the search.
+  return createPortal(
     <>
-      <div className="modal-backdrop" style={{ zIndex: 140 }} onClick={onClose} />
+      {/* Invisible: it only catches clicks outside the panel, so the page stays visible behind the search. */}
+      <div className="modal-backdrop" style={{ zIndex: 140, background: 'transparent', animation: 'none' }} onClick={onClose} />
       <div className="search-panel" role="dialog">
         <input ref={ref} className="input" placeholder="Search players, teams, pages…" value={q}
           onChange={(e) => { setQ(e.target.value); setSel(0); }}
@@ -146,6 +160,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
           ))}
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

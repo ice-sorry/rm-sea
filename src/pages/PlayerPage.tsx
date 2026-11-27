@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useLeague } from '../lib/league';
 import { loadCareer, useCached, type CareerLine } from '../lib/cache';
 import { useDoc } from '../lib/hooks';
-import { Avatar, Crest, TeamChip, StatCard, Empty, PageHeader, Flag } from '../components/ui';
+import { Avatar, Crest, TeamChip, StatCard, Empty, PageHeader, Flag, Tabs } from '../components/ui';
 import { ProfileEditor, MyRequests, MyInvites, WrappedViewer } from '../components/player';
 import { findCountry } from '../lib/countries';
 import { useModal, playerHref, teamHref } from '../modals/ModalContext';
@@ -23,6 +24,7 @@ export default function PlayerPage({ id }: { id: string }) {
   const ttl = L.isAdmin ? 0 : undefined;
   const lines = useCached(`career|${id}|${seasonIds.join(',')}`, () => loadCareer(id, seasonIds, ttl), ttl) || [];
   const history = seasonIds.map((sid) => lines.find((l) => l.s === sid)).filter((l): l is CareerLine => !!l);
+  const [statsTab, setStatsTab] = useState<'season' | 'career'>('season');
 
   if (!p) {
     return (
@@ -72,51 +74,50 @@ export default function PlayerPage({ id }: { id: string }) {
         {isMe && <ProfileEditor />}
         {held.length > 0 && <div className="row wrap">{held.map((r) => <span key={r.key} className="badge warn"><ScrollText size={12} aria-hidden />{r.label}: {r.value}</span>)}</div>}
 
-        <div className="grid-2">
-          <section>
-            <div className="eyebrow">{L.season?.name || 'This season'}</div>
-            <div className="stats-row">
-              <StatCard value={s?.gp ?? 0} label="games" /><StatCard value={s?.goals ?? 0} label="goals" /><StatCard value={s?.assists ?? 0} label="assists" />
-              <StatCard value={s?.saves ?? 0} label="saves" /><StatCard value={s?.mvps ?? 0} label="MVPs" /><StatCard value={pct(s?.adv.winRate)} label="win rate" />
-            </div>
-          </section>
-          <section>
-            <div className="eyebrow">Career</div>
-            {career ? (
+        <section className="stack">
+          <Tabs tabs={[{ key: 'season', label: L.season?.name || 'This season' }, { key: 'career', label: 'Career' }]} active={statsTab} onChange={setStatsTab} pill />
+          {statsTab === 'season' ? (
+            <>
               <div className="stats-row">
-                <StatCard value={career.gp} label="games" /><StatCard value={career.goals} label="goals" /><StatCard value={career.assists} label="assists" />
-                <StatCard value={career.saves} label="saves" /><StatCard value={career.mvps} label="MVPs" />
+                <StatCard value={s?.gp ?? 0} label="games" /><StatCard value={s?.goals ?? 0} label="goals" /><StatCard value={s?.assists ?? 0} label="assists" />
+                <StatCard value={s?.saves ?? 0} label="saves" /><StatCard value={s?.mvps ?? 0} label="MVPs" /><StatCard value={pct(s?.adv.winRate)} label="win rate" />
               </div>
-            ) : <Empty>No career stats yet.</Empty>}
-          </section>
-        </div>
-
-        <div className="grid-2">
-          <section className="card flush">
-            <div style={{ padding: 16, paddingBottom: 0 }}><h3>Season by season</h3></div>
-            {!history.length ? <Empty>No seasons played yet.</Empty> : (
-              <div className="table-wrap">
-                <table className="data"><thead><tr><th>Season</th><th>Team</th><th className="n">GP</th><th className="n">G</th><th className="n">A</th><th className="n">SV</th><th className="n">MVP</th></tr></thead>
-                  <tbody>{history.map((row) => (
-                    <tr key={row.s}><td>{L.seasons.find((x) => x.id === row.s)?.name}</td><td><TeamChip team={row.t ? L.teams[row.t] : null} /></td>
-                      <td className="n">{row.gp}</td><td className="n">{row.g}</td><td className="n">{row.a}</td><td className="n">{row.sv}</td><td className="n">{row.m}</td></tr>
-                  ))}</tbody></table>
-              </div>
-            )}
-          </section>
-          <section className="card">
-            <h3>Recent series</h3>
-            {!recent.length ? <Empty>No series played this season.</Empty> : recent.map((m) => {
-              const tot = m.games.reduce((acc, g) => { const x = g.playerStats?.[id]; return x ? { g: acc.g + (x.goals || 0), a: acc.a + (x.assists || 0) } : acc; }, { g: 0, a: 0 });
-              return (
-                <div key={m.id} className="leader" style={{ gridTemplateColumns: '1fr auto' }} onClick={() => open({ kind: 'match', id: m.id })}>
-                  <span className="ellipsis">{L.teams[m.homeTeamId]?.shortName} {m.seriesHome}–{m.seriesAway} {L.teams[m.awayTeamId]?.shortName}</span>
-                  <span className="small">{tot.g}G {tot.a}A{m.mvpPlayerId === id ? <Star size={12} aria-label="MVP" style={{ marginLeft: 4 }} /> : ''}</span>
+              <section className="card">
+                <h3>Recent series</h3>
+                {!recent.length ? <Empty>No series played this season.</Empty> : recent.map((m) => {
+                  const tot = m.games.reduce((acc, g) => { const x = g.playerStats?.[id]; return x ? { g: acc.g + (x.goals || 0), a: acc.a + (x.assists || 0) } : acc; }, { g: 0, a: 0 });
+                  return (
+                    <div key={m.id} className="leader" style={{ gridTemplateColumns: '1fr auto' }} onClick={() => open({ kind: 'match', id: m.id })}>
+                      <span className="ellipsis">{L.teams[m.homeTeamId]?.shortName} {m.seriesHome}–{m.seriesAway} {L.teams[m.awayTeamId]?.shortName}</span>
+                      <span className="small">{tot.g}G {tot.a}A{m.mvpPlayerId === id ? <Star size={12} aria-label="MVP" style={{ marginLeft: 4 }} /> : ''}</span>
+                    </div>
+                  );
+                })}
+              </section>
+            </>
+          ) : (
+            <>
+              {career ? (
+                <div className="stats-row">
+                  <StatCard value={career.gp} label="games" /><StatCard value={career.goals} label="goals" /><StatCard value={career.assists} label="assists" />
+                  <StatCard value={career.saves} label="saves" /><StatCard value={career.mvps} label="MVPs" />
                 </div>
-              );
-            })}
-          </section>
-        </div>
+              ) : <Empty>No career stats yet.</Empty>}
+              <section className="card flush">
+                <div style={{ padding: 16, paddingBottom: 0 }}><h3>Season by season</h3></div>
+                {!history.length ? <Empty>No seasons played yet.</Empty> : (
+                  <div className="table-wrap">
+                    <table className="data"><thead><tr><th>Season</th><th>Team</th><th className="n">GP</th><th className="n">G</th><th className="n">A</th><th className="n">SV</th><th className="n">MVP</th></tr></thead>
+                      <tbody>{history.map((row) => (
+                        <tr key={row.s}><td>{L.seasons.find((x) => x.id === row.s)?.name}</td><td><TeamChip team={row.t ? L.teams[row.t] : null} /></td>
+                          <td className="n">{row.gp}</td><td className="n">{row.g}</td><td className="n">{row.a}</td><td className="n">{row.sv}</td><td className="n">{row.m}</td></tr>
+                      ))}</tbody></table>
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+        </section>
         {isMe && wrappedOpen && <WrappedViewer slides={wrapped!.slides} />}
         {isMe && <MyRequests />}
       </main>

@@ -55,9 +55,10 @@ export function StatCard({ value, label }: { value: ReactNode; label: string }) 
   return <div className="stat-card"><div className="big num">{value}</div><div className="label">{label}</div></div>;
 }
 
-export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { key: T; label: string; icon?: LucideIcon }[]; active: T; onChange: (k: T) => void }) {
+/** `pill`: rounded-rectangle buttons instead of the default underlined tabs. */
+export function Tabs<T extends string>({ tabs, active, onChange, pill }: { tabs: { key: T; label: string; icon?: LucideIcon }[]; active: T; onChange: (k: T) => void; pill?: boolean }) {
   return (
-    <div className="tabs" role="tablist">
+    <div className={`tabs ${pill ? 'tabs-pill' : ''}`} role="tablist">
       {tabs.map((t) => (
         <button key={t.key} role="tab" aria-selected={active === t.key} className={`tab ${active === t.key ? 'active' : ''}`} onClick={() => onChange(t.key)}>
           {t.icon && <t.icon size={15} aria-hidden />}{t.label}

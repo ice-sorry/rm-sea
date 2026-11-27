@@ -32,7 +32,8 @@ export default function PlayersPage() {
     {
       key: 'name', label: 'Player', get: (r) => r.player.name.toLowerCase(),
       render: (r) => (
-        <div style={{ minWidth: 200 }}>
+        // Capped so a long list of award badges wraps instead of stretching the column.
+        <div className="player-cell">
           <span className="row"><Avatar src={r.player.avatarUrl} name={r.player.name} size="sm" /><b>{r.player.name}</b></span>
           {r.awards.length > 0 && (
             <div className="player-awards">{r.awards.map((a) => <span key={a.seasonName + a.id} className="badge warn" title={a.value != null ? String(a.value) : undefined}><AwardIcon type={a.type} />{a.label} · {a.seasonName}</span>)}</div>

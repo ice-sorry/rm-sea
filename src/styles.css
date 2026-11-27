@@ -134,17 +134,19 @@ img { max-width: 100%; }
 .flag.lg { width: 36px; height: 26px; border-radius: 3px; }
 
 /* ---------- Teams page ---------- */
-.teams-list { display: flex; flex-direction: column; gap: 40px; margin-top: var(--s6); }
+/* Two columns of team cards from 900px; one on phones. */
+.teams-list { display: grid; grid-template-columns: 1fr; gap: var(--s4); margin-top: calc(var(--s4) - var(--s8)); }
+@media (min-width: 900px) { .teams-list { grid-template-columns: 1fr 1fr; gap: var(--s5); } }
 .team-row { --team: var(--accent); display: flex; align-items: center; gap: var(--s4); padding: var(--s5) var(--s4); border-radius: var(--radius); background: var(--surface); background: linear-gradient(100deg, color-mix(in srgb, var(--team) 24%, var(--surface)) 0%, color-mix(in srgb, var(--team) 8%, var(--surface)) 45%, var(--surface) 80%); border: 1px solid var(--border); box-shadow: inset 6px 0 0 var(--team); cursor: pointer; transition: border-color var(--motion); }
 .team-row:hover { border-color: var(--team); text-decoration: none; }
-.team-row .team-name { font-family: var(--font-display); font-weight: 800; font-size: 36px; line-height: 1.05; text-transform: uppercase; color: var(--text); overflow-wrap: anywhere; }
+.team-row .team-name { font-family: var(--font-display); font-weight: 800; font-size: 28px; line-height: 1.05; text-transform: uppercase; color: var(--text); overflow-wrap: anywhere; }
 .team-row .team-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; color: var(--text-muted); font-size: 15px; }
 .team-row .team-meta span { display: inline-flex; align-items: center; gap: 6px; }
 .team-row .team-awards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .team-row .team-awards .badge { font-size: 15px; padding: 4px 10px; }
 .team-row .crest.lg { width: 70px; height: 70px; font-size: 24px; border-radius: 14px; }
 .team-row { padding-left: 28px; }
-@media (min-width: 900px) { .team-row .team-name { font-size: 52px; } .team-row .crest.lg { width: 96px; height: 96px; font-size: 32px; border-radius: 18px; } .team-row { padding-left: 36px; } }
+@media (min-width: 900px) { .team-row .team-name { font-size: 34px; } .team-row .crest.lg { width: 80px; height: 80px; font-size: 27px; border-radius: 16px; } .team-row { padding-left: 28px; } }
 .season-select { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 6px; font-size: 13px; }
 
 /* ---------- Bottom nav (mobile) ---------- */
@@ -228,7 +230,7 @@ img.crest.logo { background: none; border-radius: 0; object-fit: contain; }
 .crest.lg.long { font-size: 16px; }
 .crest.sm.long { font-size: 7px; letter-spacing: -0.2px; }
 .team-row .crest.lg.long { font-size: 19px; }
-@media (min-width: 900px) { .team-row .crest.lg.long { font-size: 26px; } }
+@media (min-width: 900px) { .team-row .crest.lg.long { font-size: 22px; } }
 .team-cell { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
 /* A text badge inside a team-coloured chip gets a faint ring so it doesn't melt into the chip. */
 .team-chip-wrap { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
@@ -255,6 +257,15 @@ img.crest.logo { background: none; border-radius: 0; object-fit: contain; }
 .match-card .meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 .match-card .tint { position: absolute; inset: 0 auto 0 0; width: 3px; }
 .match-card .tint.r { left: auto; right: 0; }
+/* Played results: the winner's colour fades in from their side; a draw glows white from both sides.
+   Drawn on a layer behind the content (isolation keeps z-index -1 inside the card), so hover still works. */
+.match-card.won-home, .match-card.won-away, .match-card.drawn { isolation: isolate; }
+.match-card.won-home::before, .match-card.won-away::before, .match-card.drawn::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.match-card.won-home::before { background: linear-gradient(115deg, color-mix(in srgb, var(--win-team, transparent) 16%, transparent), transparent 50%); }
+.match-card.won-away::before { background: linear-gradient(245deg, color-mix(in srgb, var(--win-team, transparent) 16%, transparent), transparent 50%); }
+.match-card.drawn::before {
+  background: linear-gradient(115deg, rgb(255 255 255 / 0.06), transparent 35%), linear-gradient(245deg, rgb(255 255 255 / 0.06), transparent 35%);
+}
 .card-list { display: grid; gap: var(--s2); }
 @media (min-width: 900px) { .card-list.two { grid-template-columns: 1fr 1fr; } }
 .winner { font-weight: 700; }
@@ -449,3 +460,36 @@ table.data thead tr.group-row th.group { color: var(--accent-2); box-shadow: ins
 svg.lucide { flex: none; vertical-align: -0.15em; }
 .hero-pin .trophy { color: var(--zone-champion); line-height: 1; }
 .admin-nav-mobile .btn { gap: 6px; }
+
+/* ---------- Desktop side margins ----------
+   Kept last so it wins over the earlier padding rules. Scales with the window up to 72px; the top bar and
+   page header band use the same inset so everything lines up. */
+@media (min-width: 1200px) {
+  .page, .page-header-inner { padding-left: clamp(24px, 4.5vw, 72px); padding-right: clamp(24px, 4.5vw, 72px); }
+  /* The top bar keeps a tighter inset so the nav has room. */
+  .topbar-inner { padding-left: clamp(16px, 2vw, 40px); padding-right: clamp(16px, 2vw, 40px); }
+}
+
+/* ---------- Top bar on narrower desktops ----------
+   Nine labelled links plus search, season and account need about 1,450px. Below that the links show icons
+   only (the label is the tooltip), and the search button drops its text below 1,700px. The logo never
+   shrinks, so nothing can slide over it. */
+.brand { flex: none; }
+@media (min-width: 900px) and (max-width: 1499px) {
+  .nav a .nav-label { display: none; }
+  .nav a { padding: 6px 9px; }
+}
+@media (min-width: 900px) and (max-width: 1699px) {
+  .search-btn .search-label, .search-btn kbd { display: none; }
+}
+
+/* Players page: the name column. Table cells don't wrap (white-space: nowrap), so cap the width and let
+   the award badges wrap onto more lines. */
+.player-cell { min-width: 200px; max-width: 300px; white-space: normal; }
+
+/* Pill tabs (<Tabs pill>): rounded-rectangle buttons, the active one filled with the accent colour.
+   Not ".pill": that class is the 20px W/D/L form box. */
+.tabs.tabs-pill { border-bottom: 0; gap: var(--s2); }
+.tabs.tabs-pill .tab { border: 1px solid var(--border); border-radius: 10px; padding: 8px 16px; background: var(--surface); transition: background var(--motion), color var(--motion), border-color var(--motion); }
+.tabs.tabs-pill .tab:hover { background: var(--surface-2); }
+.tabs.tabs-pill .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }

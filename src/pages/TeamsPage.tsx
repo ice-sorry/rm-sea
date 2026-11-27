@@ -17,15 +17,37 @@ export default function TeamsPage() {
   const all = useAllAwards();
   const awards = useMemo(() => all && all.filter((a) => a.recipientType === 'team'), [all]);
 
+  const [q, setQ] = useState('');
+  const [entry, setEntry] = useState<'' | 'in' | 'out'>('');
+  const [openOnly, setOpenOnly] = useState(false);
+
   const cap = rosterLimit(L.general);
-  const teams = L.teamList.filter((t) => t.active !== false && !t.mergedInto).sort((a, b) => a.name.localeCompare(b.name));
+  const allTeams = L.teamList.filter((t) => t.active !== false && !t.mergedInto).sort((a, b) => a.name.localeCompare(b.name));
+  const entered = new Set(L.entries.map((e) => e.teamId));
+  const s = q.trim().toLowerCase();
+  const teams = allTeams
+    .filter((t) => !s || t.name.toLowerCase().includes(s) || (t.shortName || '').toLowerCase().includes(s))
+    .filter((t) => !entry || (entry === 'in') === entered.has(t.id))
+    .filter((t) => !openOnly || squadIds(L, t.id).length < cap);
+  const seasonName = L.season?.name || 'this season';
   return (
     <>
-      <PageHeader eyebrow={`${teams.length} clubs`} title="Teams"
+      <PageHeader eyebrow={`${allTeams.length} clubs`} title="Teams"
         right={<button className="btn primary" onClick={() => setCreating(!creating)}><Plus size={16} aria-hidden />Create team</button>} />
       <main className="page">
         {creating && <CreateTeam onDone={() => setCreating(false)} />}
-        {!L.ready ? <Skeleton /> : !teams.length ? <Empty>No teams yet.</Empty> : (
+        <div className="row wrap">
+          <input className="input" style={{ maxWidth: 260 }} placeholder="Search teams…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <select className="select" style={{ width: 'auto' }} value={entry} onChange={(e) => setEntry(e.target.value as typeof entry)}>
+            <option value="">All teams</option>
+            <option value="in">In {seasonName}</option>
+            <option value="out">Not in {seasonName}</option>
+          </select>
+          {cap > 0 && <label className="check"><input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} />Has open spots</label>}
+          <span className="grow" />
+          {teams.length !== allTeams.length && <span className="small muted">{teams.length} of {allTeams.length}</span>}
+        </div>
+        {!L.ready ? <Skeleton /> : !allTeams.length ? <Empty>No teams yet.</Empty> : !teams.length ? <Empty>No teams match.</Empty> : (
           <div className="teams-list">
             {teams.map((t) => {
               const mine = (awards || []).filter((a) => a.recipientId === t.id);
