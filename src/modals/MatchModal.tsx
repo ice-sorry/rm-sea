@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { syncPublicDocs } from '../lib/db';
 import { useLeague } from '../lib/league';
@@ -12,7 +12,7 @@ import { imageSrc, normalizeImageLink } from '../lib/images';
 import type { MatchDoc, Team } from '../lib/types';
 import type { Game } from '../../core/shared/league';
 import { DEFAULT_SEASON, STAT_KEYS, STAT_LABELS } from '../../core/shared/league';
-import { Camera, ChevronDown, ChevronRight, Clock, Goal, Star, Wrench } from 'lucide-react';
+import { Camera, ChevronDown, ChevronRight, Clock, Copy, Gamepad2, Goal, Star, Wrench } from 'lucide-react';
 
 // The series MVP line is switched off for now; per-game MVPs still show in the tables.
 const SHOW_SERIES_MVP = false;
@@ -29,6 +29,12 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
   const { data: m, loading } = useDoc<MatchDoc>(path);
   const { run, busy } = useAction();
   const canKickoff = useCanSetKickoff(m ? [m.homeTeamId, m.awayTeamId] : []);
+  // Lobby code: only admins, captains and players of either team. The rules enforce it; this just avoids asking.
+  const me = L.myPlayer;
+  const matchSeason = cupId ? null : seasonId || L.seasonId;
+  const onSide = !!me && !!m && [m.homeTeamId, m.awayTeamId].some((t) => me.currentTeamId === t
+    || (matchSeason === L.seasonId && (L.rosters[t] || []).includes(me.id)));
+  const canSeeLobby = !!m && m.status !== 'played' && m.status !== 'void' && (canKickoff || onSide);
   // The whole popup takes the winning team's colour. The modal shell lives outside this component, so set it there.
   const root = useRef<HTMLDivElement>(null);
   const winColor = m?.status === 'played' && m.winnerTeamId ? L.teams[m.winnerTeamId]?.color : undefined;
@@ -109,6 +115,7 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
           <span className="small muted">Times are in your local timezone.</span>
         </div>
       )}
+      {canSeeLobby && <LobbyCode path={`lobbyCodes/${path.replace('/matches/', '/')}`} canEdit={canKickoff} />}
       {slots.length > 0 && (canUpload || slots.some((n) => shots[n])) && (
         <div className="card stack match-game">
           <div className="eyebrow" style={{ margin: 0 }}><Camera size={12} aria-hidden /> Game screenshots</div>
@@ -129,6 +136,42 @@ export default function MatchModal({ id, cupId, seasonId }: { id: string; cupId?
         </div>
       )}
       {L.isAdmin && <div className="row" style={{ justifyContent: 'center' }}><a className="btn sm" href={`#admin/result?${cupId ? `cup=${cupId}&` : ''}match=${id}`}><Wrench size={15} aria-hidden />Edit result</a></div>}
+    </div>
+  );
+}
+
+/** The in-game lobby code: shown to both teams, set by either captain (or an admin). Kept out of the public match doc. */
+function LobbyCode({ path, canEdit }: { path: string; canEdit: boolean }) {
+  const L = useLeague();
+  const { data, loading } = useDoc<{ code: string }>(path);
+  const { run, busy } = useAction();
+  const [draft, setDraft] = useState<string | null>(null);
+  const code = data?.code || '';
+  if (loading) return null;
+  if (!code && !canEdit) return null;
+  const value = draft ?? code;
+  const save = () => run(async () => {
+    const next = value.trim().slice(0, 64);
+    if (next) await setDoc(doc(db, path), { code: next, updatedBy: L.authUser!.uid, updatedAt: serverTimestamp() });
+    else await deleteDoc(doc(db, path));
+    setDraft(null);
+  }, value.trim() ? 'Lobby code saved' : 'Lobby code cleared');
+  return (
+    <div className="card stack" style={{ padding: 12 }}>
+      <div className="eyebrow" style={{ margin: 0 }}><Gamepad2 size={12} aria-hidden /> Lobby code</div>
+      {code ? (
+        <div className="row" style={{ justifyContent: 'center' }}>
+          <b className="num" style={{ fontSize: 22, letterSpacing: 1 }}>{code}</b>
+          <button className="btn sm ghost" aria-label="Copy lobby code" onClick={() => run(() => navigator.clipboard.writeText(code), 'Copied')}><Copy size={14} aria-hidden /></button>
+        </div>
+      ) : <span className="small muted">No lobby code yet.</span>}
+      {canEdit && (
+        <div className="row wrap">
+          <input className="input" style={{ maxWidth: 240 }} placeholder="Lobby code" maxLength={64} value={value} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && draft !== null && void save()} />
+          <button className="btn sm primary" disabled={busy || draft === null || draft.trim() === code} onClick={() => void save()}>{value.trim() || !code ? 'Save code' : 'Clear code'}</button>
+        </div>
+      )}
+      <span className="small muted">Only team captains, players and admins can see this.</span>
     </div>
   );
 }

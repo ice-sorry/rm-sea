@@ -4,7 +4,7 @@
 import { readFileSync } from 'fs';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment, RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 let env: RulesTestEnvironment;
 const USER = 'discord:200', ADMIN = 'discord:300', OWNER = 'discord:400', CAPTAIN = 'discord:500', ROSTERED = 'discord:700';
@@ -194,5 +194,54 @@ describe('self-service', () => {
   it('predictions are per-user', async () => {
     await assertSucceeds(setDoc(doc(as(USER), `seasons/s1/predictions/${USER}`), { picks: {} }));
     await assertFails(setDoc(doc(as(USER), `seasons/s1/predictions/${CAPTAIN}`), { picks: {} }));
+  });
+});
+
+describe('match lobby codes', () => {
+  const S = 'lobbyCodes/seasons/s1/m1', C = 'lobbyCodes/cups/c1/m1';
+  const OUTSIDER = 'discord:800', AWAY = 'discord:900';
+  const code = (uid: string, c = 'ABC123') => ({ code: c, updatedBy: uid, updatedAt: serverTimestamp() });
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, 'cups/c1'), { name: 'Cup', seasonId: 's1' });
+      // A player on another club, and one on the away team by current club only (not on a roster).
+      await setDoc(doc(d, `users/${OUTSIDER}`), { discordId: '800', role: 'user', playerId: 'p-out' });
+      await setDoc(doc(d, 'players/p-out'), { name: 'Out', ownerUid: OUTSIDER, currentTeamId: 't3' });
+      await setDoc(doc(d, `users/${AWAY}`), { discordId: '900', role: 'user', playerId: 'p-away' });
+      await setDoc(doc(d, 'players/p-away'), { name: 'Away', ownerUid: AWAY, currentTeamId: 't2' });
+      await setDoc(doc(d, S), { code: 'SECRET', updatedBy: CAPTAIN });
+      await setDoc(doc(d, C), { code: 'SECRET', updatedBy: CAPTAIN });
+    });
+  });
+  it('only players, captains and admins of either team can read it', async () => {
+    for (const p of [S, C]) {
+      await assertSucceeds(getDoc(doc(as(CAPTAIN), p)));
+      await assertSucceeds(getDoc(doc(as(ROSTERED), p))); // on the t1 roster
+      await assertSucceeds(getDoc(doc(as(AWAY), p))); // t2 by current club
+      await assertSucceeds(getDoc(doc(as(ADMIN, 'admin'), p)));
+      await assertFails(getDoc(doc(as(null), p)));
+      await assertFails(getDoc(doc(as(USER), p)));
+      await assertFails(getDoc(doc(as(OUTSIDER), p)));
+    }
+    await assertFails(getDocs(collection(as(USER), 'lobbyCodes/seasons/s1')));
+  });
+  it('captains of either team and admins set it; players cannot', async () => {
+    for (const p of [S, C]) {
+      await assertSucceeds(setDoc(doc(as(CAPTAIN), p), code(CAPTAIN)));
+      await assertSucceeds(setDoc(doc(as(ADMIN, 'admin'), p), code(ADMIN)));
+      await assertFails(setDoc(doc(as(ROSTERED), p), code(ROSTERED)));
+      await assertFails(setDoc(doc(as(AWAY), p), code(AWAY)));
+      await assertFails(setDoc(doc(as(USER), p), code(USER)));
+    }
+    await assertSucceeds(deleteDoc(doc(as(CAPTAIN), S)));
+    await assertFails(deleteDoc(doc(as(ROSTERED), C)));
+  });
+  it('validates the code and stamps', async () => {
+    await assertFails(setDoc(doc(as(CAPTAIN), S), code(ADMIN)));
+    await assertFails(setDoc(doc(as(CAPTAIN), S), code(CAPTAIN, 'x'.repeat(65))));
+    await assertFails(setDoc(doc(as(CAPTAIN), S), { ...code(CAPTAIN), extra: 1 }));
+    await assertFails(setDoc(doc(as(CAPTAIN), 'lobbyCodes/seasons/s1/nope'), code(CAPTAIN)));
+    await assertFails(setDoc(doc(as(CAPTAIN), 'lobbyCodes/seasons/s2/m1'), code(CAPTAIN))); // locked season
   });
 });

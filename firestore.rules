@@ -23,6 +23,52 @@ service cloud.firestore {
         && (myPlayerId() in captains(resource.data.homeTeamId) || myPlayerId() in captains(resource.data.awayTeamId));
     }
 
+    // ---------- Match lobby codes ----------
+    // Match docs are public, so each match's in-game lobby code lives in its own doc under lobbyCodes/, at the
+    // match's path minus "/matches": lobbyCodes/seasons/{s}/{m} and lobbyCodes/cups/{c}/{m}.
+    // Readable by admins, captains and players of either team; set by captains of either team (or admins).
+    function matchTeams(mp) { let d = get(mp).data; return [d.homeTeamId, d.awayTeamId]; }
+    function captainOfMatch(mp) {
+      let t = matchTeams(mp);
+      let me = myPlayerId();
+      return me != null && (me in captains(t[0]) || me in captains(t[1]));
+    }
+    function rosterHas(s, t, me) {
+      let r = /databases/$(db)/documents/seasons/$(s)/rosters/$(t);
+      return exists(r) && me in get(r).data.get('playerIds', []);
+    }
+    // On either team: by the player's current club, or (season s, when given) on that season's roster.
+    function memberOfMatch(mp, s) {
+      let t = matchTeams(mp);
+      let me = myPlayerId();
+      let p = /databases/$(db)/documents/players/$(me);
+      return me != null && (
+        (exists(p) && get(p).data.get('currentTeamId', null) in t)
+        || (s != null && (rosterHas(s, t[0], me) || rosterHas(s, t[1], me))));
+    }
+    function canSeeLobby(mp, s) { return isAdmin() || (signedIn() && (memberOfMatch(mp, s) || captainOfMatch(mp))); }
+    function validLobby() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['code', 'updatedBy', 'updatedAt'])
+        && d.code is string && d.code.size() <= 64
+        && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+    }
+    function canSetLobby(mp) { return signedIn() && exists(mp) && (isAdmin() || captainOfMatch(mp)); }
+    function seasonMatch(s, m) { return /databases/$(db)/documents/seasons/$(s)/matches/$(m); }
+    function cupMatch(c, m) { return /databases/$(db)/documents/cups/$(c)/matches/$(m); }
+    function cupSeason(c) { return get(/databases/$(db)/documents/cups/$(c)).data.get('seasonId', null); }
+
+    match /lobbyCodes/seasons/{s}/{m} {
+      allow read: if canSeeLobby(seasonMatch(s, m), s);
+      allow create, update: if !seasonLocked(s) && canSetLobby(seasonMatch(s, m)) && validLobby();
+      allow delete: if canSetLobby(seasonMatch(s, m));
+    }
+    match /lobbyCodes/cups/{c}/{m} {
+      allow read: if canSeeLobby(cupMatch(c, m), cupSeason(c));
+      allow create, update: if canSetLobby(cupMatch(c, m)) && validLobby();
+      allow delete: if canSetLobby(cupMatch(c, m));
+    }
+
     match /users/{uid} {
       allow read: if signedIn();
       allow update: if request.auth.uid == uid
